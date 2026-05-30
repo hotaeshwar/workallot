@@ -1,39 +1,60 @@
-name: Build and Deploy
+name: Deploy to GitHub Pages
 
 on:
   push:
     branches:
-      - main
       - master
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    concurrency: ci-${{ github.ref }}
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout 🛎️
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 22 ⚙️
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
 
       - name: Remove Windows lockfile for multi-platform compatibility 🧹
         run: rm -f package-lock.json
 
-      - name: Install Dependencies 🔧
-        run: npm install
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
 
-      - name: Build Application 🏗️
+      - name: Build application
         run: npm run build
+        env:
+          NODE_ENV: production
 
-      - name: Deploy to GitHub Pages 🚀
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload production build
+        uses: actions/upload-pages-artifact@v3
         with:
-          folder: dist
-          branch: gh-pages
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
