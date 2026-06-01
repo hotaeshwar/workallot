@@ -6,7 +6,7 @@ import {
 } from 'firebase/firestore';
 import { 
   PlusCircle, Edit3, Trash2, Archive, Search, ExternalLink, 
-  CheckCircle, AlertCircle, RefreshCw, X, Save, Plus, Trash, Link2 
+  CheckCircle, AlertCircle, RefreshCw, X, Save, Plus, Trash, Share2 
 } from 'lucide-react';
 
 export default function WorkAllocation() {
@@ -17,13 +17,14 @@ export default function WorkAllocation() {
   // Form states
   const [selectedEmpId, setSelectedEmpId] = useState('');
   const [selectedClientId, setSelectedClientId] = useState('');
-  const [workType, setWorkType] = useState('story');
-  const [urls, setUrls] = useState(['']);
-  const [driveUrl, setDriveUrl] = useState('');
-  const [remark, setRemark] = useState('');
   const [allocationDate, setAllocationDate] = useState(
     new Date().toLocaleDateString('en-CA') // YYYY-MM-DD format
   );
+
+  // Multiple tasks state in creation form
+  const [tasks, setTasks] = useState([
+    { type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }
+  ]);
 
   // Table states
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,11 +36,8 @@ export default function WorkAllocation() {
   const [editingAlloc, setEditingAlloc] = useState(null);
   const [editEmpId, setEditEmpId] = useState('');
   const [editClientId, setEditClientId] = useState('');
-  const [editWorkType, setEditWorkType] = useState('');
-  const [editUrls, setEditUrls] = useState(['']);
-  const [editDriveUrl, setEditDriveUrl] = useState('');
-  const [editRemark, setEditRemark] = useState('');
   const [editDate, setEditDate] = useState('');
+  const [editTasks, setEditTasks] = useState([]);
 
   // Listeners for dropdowns and allocations
   useEffect(() => {
@@ -78,6 +76,110 @@ export default function WorkAllocation() {
     };
   }, []);
 
+  // Handlers for dynamic tasks in Creation form
+  const handleAddTask = () => {
+    setTasks([...tasks, { type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
+  };
+
+  const handleRemoveTask = (index) => {
+    setTasks(tasks.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateTaskField = (index, field, value) => {
+    const updatedTasks = [...tasks];
+    updatedTasks[index] = { ...updatedTasks[index], [field]: value };
+    setTasks(updatedTasks);
+  };
+
+  const handleAddTaskUrl = (taskIndex) => {
+    const updatedTasks = [...tasks];
+    updatedTasks[taskIndex].urls = [...updatedTasks[taskIndex].urls, ''];
+    setTasks(updatedTasks);
+  };
+
+  const handleRemoveTaskUrl = (taskIndex, urlIndex) => {
+    const updatedTasks = [...tasks];
+    updatedTasks[taskIndex].urls = updatedTasks[taskIndex].urls.filter((_, i) => i !== urlIndex);
+    setTasks(updatedTasks);
+  };
+
+  const handleUpdateTaskUrl = (taskIndex, urlIndex, value) => {
+    const updatedTasks = [...tasks];
+    updatedTasks[taskIndex].urls[urlIndex] = value;
+    setTasks(updatedTasks);
+  };
+
+  // Handlers for dynamic tasks in Edit form
+  const handleAddEditTask = () => {
+    setEditTasks([...editTasks, { type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
+  };
+
+  const handleRemoveEditTask = (index) => {
+    setEditTasks(editTasks.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateEditTaskField = (index, field, value) => {
+    const updatedTasks = [...editTasks];
+    updatedTasks[index] = { ...updatedTasks[index], [field]: value };
+    setEditTasks(updatedTasks);
+  };
+
+  const handleAddEditTaskUrl = (taskIndex) => {
+    const updatedTasks = [...editTasks];
+    updatedTasks[taskIndex].urls = [...updatedTasks[taskIndex].urls, ''];
+    setEditTasks(updatedTasks);
+  };
+
+  const handleRemoveEditTaskUrl = (taskIndex, urlIndex) => {
+    const updatedTasks = [...editTasks];
+    updatedTasks[taskIndex].urls = updatedTasks[taskIndex].urls.filter((_, i) => i !== urlIndex);
+    setEditTasks(updatedTasks);
+  };
+
+  const handleUpdateEditTaskUrl = (taskIndex, urlIndex, value) => {
+    const updatedTasks = [...editTasks];
+    updatedTasks[taskIndex].urls[urlIndex] = value;
+    setEditTasks(updatedTasks);
+  };
+
+  const shareRowOnWhatsApp = (alloc) => {
+    const rowTasks = alloc.tasks && alloc.tasks.length > 0 ? alloc.tasks : [{
+      type: alloc.type || 'story',
+      urls: alloc.urls || (alloc.url ? [alloc.url] : []),
+      driveUrl: alloc.driveUrl || '',
+      remark: alloc.remark || '',
+      status: alloc.status || 'allocated'
+    }];
+
+    let message = '';
+    rowTasks.forEach((t, index) => {
+      const resolvedStatus = t.status.charAt(0).toUpperCase() + t.status.slice(1);
+      const refUrls = t.urls && t.urls.length > 0 ? t.urls.join(', ') : 'N/A';
+
+      if (rowTasks.length > 1) {
+        message += `*Task ${index + 1}:*\n`;
+      }
+      message += `• *Client:* ${alloc.clientName}\n`;
+      message += `• *Work Type:* ${t.type.toUpperCase()}\n`;
+      message += `• *Scheduled Date:* ${alloc.date}\n`;
+      message += `• *Status:* ${resolvedStatus}\n`;
+      if (t.driveUrl) {
+        message += `• *Google Drive Link:* ${t.driveUrl}\n`;
+      }
+      if (refUrls && refUrls !== 'N/A') {
+        message += `• *Reference URLs:* ${refUrls}\n`;
+      }
+      if (t.remark) {
+        message += `• *Remarks:* ${t.remark}\n`;
+      }
+      message += `-----------------------------------------\n\n`;
+    });
+
+    const encodedText = encodeURIComponent(message);
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const handleCreateAllocation = async (e) => {
     e.preventDefault();
     if (!selectedEmpId || !selectedClientId) {
@@ -91,8 +193,14 @@ export default function WorkAllocation() {
     const emp = employees.find(e => e.id === selectedEmpId);
     const client = clients.find(c => c.id === selectedClientId);
 
-    // Filter out blank URLs
-    const finalUrls = urls.map(u => u.trim()).filter(u => u !== '');
+    // Clean up blank urls, trim strings for all tasks
+    const cleanedTasks = tasks.map(t => ({
+      type: t.type,
+      urls: t.urls.map(u => u.trim()).filter(u => u !== ''),
+      driveUrl: t.driveUrl.trim(),
+      remark: t.remark.trim(),
+      status: 'allocated'
+    }));
 
     try {
       await addDoc(collection(db, 'content_reports', 'data', 'allocations'), {
@@ -101,10 +209,7 @@ export default function WorkAllocation() {
         employeeColor: emp.color || '#94a3b8',
         clientId: selectedClientId,
         clientName: client.name,
-        type: workType,
-        urls: finalUrls,
-        driveUrl: driveUrl.trim(),
-        remark: remark.trim(),
+        tasks: cleanedTasks,
         date: allocationDate,
         status: 'allocated',
         archived: false,
@@ -112,9 +217,7 @@ export default function WorkAllocation() {
       });
 
       setSuccess('Work entry allocated successfully.');
-      setUrls(['']);
-      setDriveUrl('');
-      setRemark('');
+      setTasks([{ type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
       // Auto dismiss success after 3s
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -129,14 +232,21 @@ export default function WorkAllocation() {
     setEditingAlloc(alloc);
     setEditEmpId(alloc.employeeId);
     setEditClientId(alloc.clientId);
-    setEditWorkType(alloc.type);
-    
-    // Support backward compatibility if older records only have a single 'url' string
-    const existingUrls = alloc.urls || (alloc.url ? [alloc.url] : ['']);
-    setEditUrls(existingUrls.length > 0 ? existingUrls : ['']);
-    setEditDriveUrl(alloc.driveUrl || '');
-    setEditRemark(alloc.remark || '');
     setEditDate(alloc.date);
+    
+    // Support backward compatibility if older records don't have tasks list
+    if (alloc.tasks && alloc.tasks.length > 0) {
+      setEditTasks(JSON.parse(JSON.stringify(alloc.tasks)));
+    } else {
+      const existingUrls = alloc.urls || (alloc.url ? [alloc.url] : ['']);
+      setEditTasks([{
+        type: alloc.type || 'story',
+        urls: existingUrls.length > 0 ? existingUrls : [''],
+        driveUrl: alloc.driveUrl || '',
+        remark: alloc.remark || '',
+        status: alloc.status || 'allocated'
+      }]);
+    }
   };
 
   const handleUpdateAllocation = async (e) => {
@@ -147,7 +257,13 @@ export default function WorkAllocation() {
     const emp = employees.find(e => e.id === editEmpId);
     const client = clients.find(c => c.id === editClientId);
 
-    const finalUrls = editUrls.map(u => u.trim()).filter(u => u !== '');
+    const cleanedTasks = editTasks.map(t => ({
+      type: t.type,
+      urls: t.urls.map(u => u.trim()).filter(u => u !== ''),
+      driveUrl: t.driveUrl.trim(),
+      remark: t.remark.trim(),
+      status: t.status || 'allocated'
+    }));
 
     try {
       await updateDoc(doc(db, 'content_reports', 'data', 'allocations', editingAlloc.id), {
@@ -156,10 +272,7 @@ export default function WorkAllocation() {
         employeeColor: emp.color || '#94a3b8',
         clientId: editClientId,
         clientName: client.name,
-        type: editWorkType,
-        urls: finalUrls,
-        driveUrl: editDriveUrl.trim(),
-        remark: editRemark.trim(),
+        tasks: cleanedTasks,
         date: editDate,
       });
 
@@ -200,15 +313,28 @@ export default function WorkAllocation() {
     }
   };
 
-  // Filter allocations by search term (searches employee, client, type, remark)
+  // Filter allocations by search term (searches employee, client, task details)
   const filteredAllocations = allocations.filter(alloc => {
     const term = searchTerm.toLowerCase();
-    return (
+    
+    // Check main properties
+    const mainMatch = (
       alloc.employeeName.toLowerCase().includes(term) ||
       alloc.clientName.toLowerCase().includes(term) ||
-      alloc.type.toLowerCase().includes(term) ||
-      alloc.remark.toLowerCase().includes(term) ||
       alloc.date.includes(term)
+    );
+
+    if (mainMatch) return true;
+
+    // Check tasks list
+    const tasksToSearch = alloc.tasks && alloc.tasks.length > 0 ? alloc.tasks : [{
+      type: alloc.type || '',
+      remark: alloc.remark || ''
+    }];
+
+    return tasksToSearch.some(t => 
+      t.type.toLowerCase().includes(term) ||
+      t.remark.toLowerCase().includes(term)
     );
   });
 
@@ -220,7 +346,7 @@ export default function WorkAllocation() {
           Work Allocation Panel
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Assign daily posts, reels, or stories to active employees for respective clients.
+          Assign daily posts, reels, or stories to active employees for respective clients. Support multiple tasks in a single entry.
         </p>
       </div>
 
@@ -258,54 +384,39 @@ export default function WorkAllocation() {
               Please create at least one employee and one client in the <span className="font-semibold underline">Manage</span> tab to allocate work.
             </div>
           ) : (
-            <form onSubmit={handleCreateAllocation} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                  Select Employee
-                </label>
-                <select
-                  required
-                  value={selectedEmpId}
-                  onChange={(e) => setSelectedEmpId(e.target.value)}
-                  className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                >
-                  <option value="">-- Choose Employee --</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                  Select Client
-                </label>
-                <select
-                  required
-                  value={selectedClientId}
-                  onChange={(e) => setSelectedClientId(e.target.value)}
-                  className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                >
-                  <option value="">-- Choose Client --</option>
-                  {clients.map(cl => (
-                    <option key={cl.id} value={cl.id}>{cl.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleCreateAllocation} className="space-y-5">
+              <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                    Post Type
+                    Select Employee
                   </label>
                   <select
-                    value={workType}
-                    onChange={(e) => setWorkType(e.target.value)}
-                    className="block w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 capitalize"
+                    required
+                    value={selectedEmpId}
+                    onChange={(e) => setSelectedEmpId(e.target.value)}
+                    className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   >
-                    <option value="story">Story</option>
-                    <option value="reel">Reel</option>
-                    <option value="post">Post</option>
+                    <option value="">-- Choose Employee --</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+                    Select Client
+                  </label>
+                  <select
+                    required
+                    value={selectedClientId}
+                    onChange={(e) => setSelectedClientId(e.target.value)}
+                    className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  >
+                    <option value="">-- Choose Client --</option>
+                    {clients.map(cl => (
+                      <option key={cl.id} value={cl.id}>{cl.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -318,89 +429,134 @@ export default function WorkAllocation() {
                     required
                     value={allocationDate}
                     onChange={(e) => setAllocationDate(e.target.value)}
-                    className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>Reference URLs (Optional)</span>
+              {/* Tasks List */}
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tasks ({tasks.length})</span>
                   <button
                     type="button"
-                    onClick={() => setUrls([...urls, ''])}
-                    className="text-xs text-indigo-600 hover:text-indigo-850 font-bold flex items-center space-x-0.5 cursor-pointer"
+                    onClick={handleAddTask}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-1 cursor-pointer"
                   >
-                    <Plus className="h-3 w-3" />
-                    <span>Add URL</span>
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Add Task</span>
                   </button>
-                </label>
-                <div className="space-y-2">
-                  {urls.map((u, i) => (
-                    <div key={i} className="flex items-center space-x-2">
-                      <input
-                        type="url"
-                        value={u}
-                        onChange={(e) => {
-                          const newUrls = [...urls];
-                          newUrls[i] = e.target.value;
-                          setUrls(newUrls);
-                        }}
-                        placeholder="https://instagram.com/p/..."
-                        className="block flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                      />
-                      {urls.length > 1 && (
+                </div>
+
+                <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+                  {tasks.map((task, taskIdx) => (
+                    <div key={taskIdx} className="p-4 bg-slate-50/50 border border-slate-200/80 rounded-xl space-y-3 relative">
+                      {tasks.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => setUrls(urls.filter((_, idx) => idx !== i))}
-                          className="p-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl transition cursor-pointer"
-                          title="Remove URL"
+                          onClick={() => handleRemoveTask(taskIdx)}
+                          className="absolute top-3 right-3 text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                          title="Remove Task"
                         >
                           <Trash className="h-4 w-4" />
                         </button>
                       )}
+
+                      <span className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider">Task #{taskIdx + 1}</span>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Post Type
+                        </label>
+                        <select
+                          value={task.type}
+                          onChange={(e) => handleUpdateTaskField(taskIdx, 'type', e.target.value)}
+                          className="block w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 capitalize"
+                        >
+                          <option value="story">Story</option>
+                          <option value="reel">Reel</option>
+                          <option value="post">Post</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
+                          <span>Reference URLs (Optional)</span>
+                          <button
+                            type="button"
+                            onClick={() => handleAddTaskUrl(taskIdx)}
+                            className="text-[10px] text-indigo-600 hover:text-indigo-850 font-bold flex items-center space-x-0.5 cursor-pointer"
+                          >
+                            <Plus className="h-3 w-3" />
+                            <span>Add URL</span>
+                          </button>
+                        </label>
+                        <div className="space-y-1.5">
+                          {task.urls.map((u, urlIdx) => (
+                            <div key={urlIdx} className="flex items-center space-x-1.5">
+                              <input
+                                type="url"
+                                value={u}
+                                onChange={(e) => handleUpdateTaskUrl(taskIdx, urlIdx, e.target.value)}
+                                placeholder="https://instagram.com/p/..."
+                                className="block flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                              />
+                              {task.urls.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveTaskUrl(taskIdx, urlIdx)}
+                                  className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-150 rounded-lg transition cursor-pointer"
+                                  title="Remove URL"
+                                >
+                                  <Trash className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Google Drive Link (Optional)
+                        </label>
+                        <input
+                          type="url"
+                          value={task.driveUrl}
+                          onChange={(e) => handleUpdateTaskField(taskIdx, 'driveUrl', e.target.value)}
+                          placeholder="https://drive.google.com/..."
+                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Remark / Instructions
+                        </label>
+                        <textarea
+                          value={task.remark}
+                          onChange={(e) => handleUpdateTaskField(taskIdx, 'remark', e.target.value)}
+                          placeholder="E.g., Publish at 6:00 PM with sports hashtags"
+                          rows="2"
+                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                  Google Drive Link (Optional)
-                </label>
-                <input
-                  type="url"
-                  value={driveUrl}
-                  onChange={(e) => setDriveUrl(e.target.value)}
-                  placeholder="https://drive.google.com/..."
-                  className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                  Remark / Instructions
-                </label>
-                <textarea
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
-                  placeholder="E.g., Publish at 6:00 PM with sports hashtags"
-                  rows="3"
-                  className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
-                />
-              </div>
-
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center space-x-2 py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                className="w-full flex items-center justify-center space-x-2 py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 transition"
               >
                 {loading ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 ) : (
                   <>
                     <PlusCircle className="h-4.5 w-4.5" />
-                    <span>Allocate Work</span>
+                    <span>Allocate Work ({tasks.length} {tasks.length === 1 ? 'Task' : 'Tasks'})</span>
                   </>
                 )}
               </button>
@@ -438,9 +594,9 @@ export default function WorkAllocation() {
                 <tr className="border-b border-slate-200 text-slate-500 text-xs font-semibold uppercase bg-slate-50/50">
                   <th className="p-3.5">Employee</th>
                   <th className="p-3.5">Client</th>
-                  <th className="p-3.5">Type</th>
+                  <th className="p-3.5">Types</th>
                   <th className="p-3.5">Scheduled Date</th>
-                  <th className="p-3.5 max-w-xs">Remarks & Link</th>
+                  <th className="p-3.5 max-w-xs">Tasks Details & Links</th>
                   <th className="p-3.5 text-center">Actions</th>
                 </tr>
               </thead>
@@ -452,105 +608,135 @@ export default function WorkAllocation() {
                     </td>
                   </tr>
                 ) : (
-                  filteredAllocations.map((alloc) => (
-                    <tr 
-                      key={alloc.id} 
-                      className="hover:bg-slate-50/50 transition duration-150"
-                    >
-                      <td className="p-3.5">
-                        <div className="flex items-center space-x-2">
-                          <span 
-                            className="inline-block w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" 
-                            style={{ backgroundColor: alloc.employeeColor }}
-                          />
-                          <span className="font-semibold text-slate-800">{alloc.employeeName}</span>
-                        </div>
-                      </td>
-                      <td className="p-3.5 font-medium text-slate-700">
-                        {alloc.clientName}
-                      </td>
-                      <td className="p-3.5">
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full capitalize ${
-                          alloc.type === 'story' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                          alloc.type === 'reel' ? 'bg-pink-50 text-pink-700 border border-pink-200' :
-                          'bg-sky-50 text-sky-700 border border-sky-200'
-                        }`}>
-                          {alloc.type}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-slate-600 font-mono text-xs font-semibold">
-                        {new Date(alloc.date).toLocaleDateString('en-US', {
-                          year: 'numeric', month: 'short', day: 'numeric'
-                        })}
-                      </td>
-                      <td className="p-3.5 text-xs text-slate-500 max-w-xs">
-                        <div className="space-y-1">
-                          {/* Render Google Drive Link if exists */}
-                          {alloc.driveUrl && (
-                            <a 
-                              href={alloc.driveUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center text-emerald-700 hover:text-emerald-800 hover:underline font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 mr-2 mb-1"
-                            >
-                              <span>Drive Link</span>
-                              <ExternalLink className="h-3 w-3 ml-1" />
-                            </a>
-                          )}
+                  filteredAllocations.map((alloc) => {
+                    const rowTasks = alloc.tasks && alloc.tasks.length > 0 ? alloc.tasks : [{
+                      type: alloc.type || 'story',
+                      urls: alloc.urls || (alloc.url ? [alloc.url] : []),
+                      driveUrl: alloc.driveUrl || '',
+                      remark: alloc.remark || '',
+                      status: alloc.status || 'allocated'
+                    }];
 
-                          {/* Render Reference URLs */}
-                          {(() => {
-                            const rowUrls = alloc.urls || (alloc.url ? [alloc.url] : []);
-                            if (rowUrls.length === 0) {
-                              return !alloc.driveUrl && <span className="text-slate-400 italic">No links provided</span>;
-                            }
-                            return (
-                              <div className="flex flex-wrap gap-1.5">
-                                {rowUrls.map((lnk, idx) => (
-                                  <a 
-                                    key={idx}
-                                    href={lnk} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center text-indigo-700 hover:text-indigo-800 hover:underline font-semibold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200"
-                                  >
-                                    <span>Ref {rowUrls.length > 1 ? idx + 1 : ''}</span>
-                                    <ExternalLink className="h-3 w-3 ml-1" />
-                                  </a>
-                                ))}
+                    return (
+                      <tr 
+                        key={alloc.id} 
+                        className="hover:bg-slate-50/50 transition duration-150"
+                      >
+                        <td className="p-3.5">
+                          <div className="flex items-center space-x-2">
+                            <span 
+                              className="inline-block w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" 
+                              style={{ backgroundColor: alloc.employeeColor }}
+                            />
+                            <span className="font-semibold text-slate-800">{alloc.employeeName}</span>
+                          </div>
+                        </td>
+                        <td className="p-3.5 font-medium text-slate-700">
+                          {alloc.clientName}
+                        </td>
+                        <td className="p-3.5">
+                          <div className="flex flex-col gap-1">
+                            {rowTasks.map((t, idx) => (
+                              <span key={idx} className={`inline-flex w-fit px-2 py-0.5 text-[10px] font-semibold rounded-full capitalize ${
+                                t.type === 'story' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                                t.type === 'reel' ? 'bg-pink-50 text-pink-700 border border-pink-200' :
+                                'bg-sky-50 text-sky-700 border border-sky-200'
+                              }`}>
+                                {t.type}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-3.5 text-slate-600 font-mono text-xs font-semibold">
+                          {new Date(alloc.date).toLocaleDateString('en-US', {
+                            year: 'numeric', month: 'short', day: 'numeric'
+                          })}
+                        </td>
+                        <td className="p-3.5 text-xs text-slate-500 max-w-xs">
+                          <div className="space-y-3">
+                            {rowTasks.map((t, idx) => (
+                              <div key={idx} className={`${rowTasks.length > 1 ? 'pb-2 border-b border-slate-100 last:pb-0 last:border-0' : ''}`}>
+                                {rowTasks.length > 1 && (
+                                  <span className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1">
+                                    Task #{idx + 1} ({t.type})
+                                  </span>
+                                )}
+                                <div className="flex flex-wrap gap-1.5 items-center">
+                                  {t.driveUrl && (
+                                    <a 
+                                      href={t.driveUrl} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center text-emerald-700 hover:text-emerald-800 hover:underline font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 text-[10px] mr-1"
+                                    >
+                                      <span>Drive Link</span>
+                                      <ExternalLink className="h-3 w-3 ml-1" />
+                                    </a>
+                                  )}
+
+                                  {t.urls && t.urls.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {t.urls.map((lnk, lIdx) => (
+                                        <a 
+                                          key={lIdx}
+                                          href={lnk} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center text-indigo-700 hover:text-indigo-800 hover:underline font-semibold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-[10px]"
+                                        >
+                                          <span>Ref {t.urls.length > 1 ? lIdx + 1 : ''}</span>
+                                          <ExternalLink className="h-3 w-3 ml-1" />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    !t.driveUrl && <span className="text-slate-400 italic text-[10px]">No links</span>
+                                  )}
+                                </div>
+                                {t.remark && (
+                                  <div className="text-slate-600 text-xs mt-1 font-normal break-words" title={t.remark}>
+                                    {t.remark}
+                                  </div>
+                                )}
                               </div>
-                            );
-                          })()}
-                        </div>
-                        <div className="truncate text-slate-600 mt-1" title={alloc.remark}>{alloc.remark || <span className="text-slate-400 italic">No remarks</span>}</div>
-                      </td>
-                      <td className="p-3.5">
-                        <div className="flex items-center justify-center space-x-1">
-                          <button
-                            onClick={() => handleOpenEdit(alloc)}
-                            className="p-1.5 bg-white hover:bg-slate-50 text-indigo-600 border border-slate-200 rounded-lg transition shadow-xs"
-                            title="Edit Entry"
-                          >
-                            <Edit3 className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleArchiveAllocation(alloc.id)}
-                            className="p-1.5 bg-white hover:bg-slate-50 text-amber-600 border border-slate-200 rounded-lg transition shadow-xs"
-                            title="Archive Entry"
-                          >
-                            <Archive className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteAllocation(alloc.id)}
-                            className="p-1.5 bg-white hover:bg-red-50 text-slate-400 hover:text-red-600 border border-slate-200 hover:border-red-200 rounded-lg transition shadow-xs"
-                            title="Delete Permanently"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-3.5">
+                          <div className="flex items-center justify-center space-x-1">
+                            <button
+                              onClick={() => shareRowOnWhatsApp(alloc)}
+                              className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 rounded-lg transition shadow-xs cursor-pointer"
+                              title="Share on WhatsApp"
+                            >
+                              <Share2 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenEdit(alloc)}
+                              className="p-1.5 bg-white hover:bg-slate-50 text-indigo-600 border border-slate-200 rounded-lg transition shadow-xs cursor-pointer"
+                              title="Edit Entry"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleArchiveAllocation(alloc.id)}
+                              className="p-1.5 bg-white hover:bg-slate-50 text-amber-600 border border-slate-200 rounded-lg transition shadow-xs cursor-pointer"
+                              title="Archive Entry"
+                            >
+                              <Archive className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAllocation(alloc.id)}
+                              className="p-1.5 bg-white hover:bg-red-50 text-slate-400 hover:text-red-600 border border-slate-200 hover:border-red-200 rounded-lg transition shadow-xs cursor-pointer"
+                              title="Delete Permanently"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -562,7 +748,7 @@ export default function WorkAllocation() {
       {/* EDIT ALLOCATION MODAL */}
       {editingAlloc && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 max-w-lg w-full rounded-2xl shadow-xl p-6 space-y-6 animate-zoom-in">
+          <div className="bg-white border border-slate-200 max-w-lg w-full rounded-2xl shadow-xl p-6 space-y-5 animate-zoom-in overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center space-x-2.5">
                 <Edit3 className="h-5 w-5 text-indigo-600" />
@@ -570,58 +756,43 @@ export default function WorkAllocation() {
               </div>
               <button
                 onClick={() => setEditingAlloc(null)}
-                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition text-slate-600"
+                className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition text-slate-600 cursor-pointer"
               >
                 <X className="h-4.5 w-4.5" />
               </button>
             </div>
 
             <form onSubmit={handleUpdateAllocation} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                  Employee
-                </label>
-                <select
-                  required
-                  value={editEmpId}
-                  onChange={(e) => setEditEmpId(e.target.value)}
-                  className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                >
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                  Client
-                </label>
-                <select
-                  required
-                  value={editClientId}
-                  onChange={(e) => setEditClientId(e.target.value)}
-                  className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                >
-                  {clients.map(cl => (
-                    <option key={cl.id} value={cl.id}>{cl.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                    Post Type
+                    Employee
                   </label>
                   <select
-                    value={editWorkType}
-                    onChange={(e) => setEditWorkType(e.target.value)}
-                    className="block w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 capitalize"
+                    required
+                    value={editEmpId}
+                    onChange={(e) => setEditEmpId(e.target.value)}
+                    className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   >
-                    <option value="story">Story</option>
-                    <option value="reel">Reel</option>
-                    <option value="post">Post</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+                    Client
+                  </label>
+                  <select
+                    required
+                    value={editClientId}
+                    onChange={(e) => setEditClientId(e.target.value)}
+                    className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  >
+                    {clients.map(cl => (
+                      <option key={cl.id} value={cl.id}>{cl.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -634,88 +805,133 @@ export default function WorkAllocation() {
                     required
                     value={editDate}
                     onChange={(e) => setEditDate(e.target.value)}
-                    className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </div>
               </div>
 
-               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>Reference URLs (Optional)</span>
+              {/* Tasks List inside Modal */}
+              <div className="space-y-3 pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tasks ({editTasks.length})</span>
                   <button
                     type="button"
-                    onClick={() => setEditUrls([...editUrls, ''])}
-                    className="text-xs text-indigo-600 hover:text-indigo-850 font-bold flex items-center space-x-0.5 cursor-pointer"
+                    onClick={handleAddEditTask}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-1 cursor-pointer"
                   >
-                    <Plus className="h-3 w-3" />
-                    <span>Add URL</span>
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Add Task</span>
                   </button>
-                </label>
-                <div className="space-y-2">
-                  {editUrls.map((u, i) => (
-                    <div key={i} className="flex items-center space-x-2">
-                      <input
-                        type="url"
-                        value={u}
-                        onChange={(e) => {
-                          const newUrls = [...editUrls];
-                          newUrls[i] = e.target.value;
-                          setEditUrls(newUrls);
-                        }}
-                        placeholder="https://instagram.com/p/..."
-                        className="block flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                      />
-                      {editUrls.length > 1 && (
+                </div>
+
+                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                  {editTasks.map((task, taskIdx) => (
+                    <div key={taskIdx} className="p-3.5 bg-slate-50/50 border border-slate-200 rounded-xl space-y-3 relative">
+                      {editTasks.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => setEditUrls(editUrls.filter((_, idx) => idx !== i))}
-                          className="p-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl transition cursor-pointer"
-                          title="Remove URL"
+                          onClick={() => handleRemoveEditTask(taskIdx)}
+                          className="absolute top-2.5 right-2.5 text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                          title="Remove Task"
                         >
-                          <Trash className="h-4 w-4" />
+                          <Trash className="h-3.5 w-3.5" />
                         </button>
                       )}
+
+                      <span className="block text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Task #{taskIdx + 1}</span>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Post Type
+                        </label>
+                        <select
+                          value={task.type}
+                          onChange={(e) => handleUpdateEditTaskField(taskIdx, 'type', e.target.value)}
+                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 capitalize"
+                        >
+                          <option value="story">Story</option>
+                          <option value="reel">Reel</option>
+                          <option value="post">Post</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
+                          <span>Reference URLs (Optional)</span>
+                          <button
+                            type="button"
+                            onClick={() => handleAddEditTaskUrl(taskIdx)}
+                            className="text-[10px] text-indigo-600 hover:text-indigo-850 font-bold flex items-center space-x-0.5 cursor-pointer"
+                          >
+                            <Plus className="h-3 w-3" />
+                            <span>Add URL</span>
+                          </button>
+                        </label>
+                        <div className="space-y-1.5">
+                          {task.urls.map((u, urlIdx) => (
+                            <div key={urlIdx} className="flex items-center space-x-1.5">
+                              <input
+                                type="url"
+                                value={u}
+                                onChange={(e) => handleUpdateEditTaskUrl(taskIdx, urlIdx, e.target.value)}
+                                placeholder="https://instagram.com/p/..."
+                                className="block flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                              />
+                              {task.urls.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveEditTaskUrl(taskIdx, urlIdx)}
+                                  className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-150 rounded-lg transition cursor-pointer"
+                                  title="Remove URL"
+                                >
+                                  <Trash className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Google Drive Link (Optional)
+                        </label>
+                        <input
+                          type="url"
+                          value={task.driveUrl}
+                          onChange={(e) => handleUpdateEditTaskField(taskIdx, 'driveUrl', e.target.value)}
+                          placeholder="https://drive.google.com/..."
+                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Remark / Instructions
+                        </label>
+                        <textarea
+                          value={task.remark}
+                          onChange={(e) => handleUpdateEditTaskField(taskIdx, 'remark', e.target.value)}
+                          rows="2"
+                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                  Google Drive Link (Optional)
-                </label>
-                <input
-                  type="url"
-                  value={editDriveUrl}
-                  onChange={(e) => setEditDriveUrl(e.target.value)}
-                  placeholder="https://drive.google.com/..."
-                  className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                  Remark / Instruction
-                </label>
-                <textarea
-                  value={editRemark}
-                  onChange={(e) => setEditRemark(e.target.value)}
-                  rows="3"
-                  className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
-                />
-              </div>
-
-              <div className="flex space-x-3 pt-2">
+              <div className="flex space-x-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setEditingAlloc(null)}
-                  className="w-1/2 py-2.5 border border-slate-200 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-50 transition"
+                  className="w-1/2 py-2.5 border border-slate-200 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-50 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="w-1/2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-sm font-semibold rounded-xl text-white transition flex items-center justify-center space-x-1.5"
+                  className="w-1/2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-sm font-semibold rounded-xl text-white transition flex items-center justify-center space-x-1.5 cursor-pointer"
                 >
                   <Save className="h-4 w-4" />
                   <span>Save Changes</span>

@@ -24,6 +24,7 @@ export default function ReportExport() {
   );
 
   const [filteredData, setFilteredData] = useState([]);
+  const [flatTasks, setFlatTasks] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Fetch all allocations (including archived ones so they can download history)
@@ -104,9 +105,63 @@ export default function ReportExport() {
     setFilteredData(result);
   }, [allocations, filterType, selectedClientId, selectedEmpId, dateRangeType, referenceDate]);
 
+  // Map allocations down to individual tasks
+  useEffect(() => {
+    const tasksList = [];
+    filteredData.forEach(alloc => {
+      if (alloc.tasks && alloc.tasks.length > 0) {
+        alloc.tasks.forEach((t, index) => {
+          tasksList.push({
+            id: `${alloc.id}_task_${index}`,
+            allocationId: alloc.id,
+            employeeId: alloc.employeeId,
+            employeeName: alloc.employeeName,
+            employeeColor: alloc.employeeColor,
+            clientId: alloc.clientId,
+            clientName: alloc.clientName,
+            date: alloc.date,
+            createdAt: alloc.createdAt,
+            archived: alloc.archived,
+            taskIndex: index,
+            type: t.type,
+            urls: t.urls || [],
+            driveUrl: t.driveUrl || '',
+            remark: t.remark || '',
+            status: t.status || 'allocated',
+            isLegacy: false,
+            parentAlloc: alloc
+          });
+        });
+      } else {
+        // Legacy support
+        tasksList.push({
+          id: alloc.id,
+          allocationId: alloc.id,
+          employeeId: alloc.employeeId,
+          employeeName: alloc.employeeName,
+          employeeColor: alloc.employeeColor,
+          clientId: alloc.clientId,
+          clientName: alloc.clientName,
+          date: alloc.date,
+          createdAt: alloc.createdAt,
+          archived: alloc.archived,
+          taskIndex: -1,
+          type: alloc.type || 'story',
+          urls: alloc.urls || (alloc.url ? [alloc.url] : []),
+          driveUrl: alloc.driveUrl || '',
+          remark: alloc.remark || '',
+          status: alloc.status || 'allocated',
+          isLegacy: true,
+          parentAlloc: alloc
+        });
+      }
+    });
+    setFlatTasks(tasksList);
+  }, [filteredData]);
+
   // Download logic 1: Excel using XML template that preserves CSS color styling (highly requested)
   const downloadColorExcel = () => {
-    if (filteredData.length === 0) {
+    if (flatTasks.length === 0) {
       alert('No data available to export.');
       return;
     }
@@ -124,28 +179,22 @@ export default function ReportExport() {
 
     // Build styled HTML table string
     let tableRows = '';
-    filteredData.forEach((alloc) => {
-      // Find contrasting text color for clarity
-      const hex = alloc.employeeColor || '#ffffff';
-      const refUrls = alloc.urls && alloc.urls.length > 0 ? alloc.urls.join(', ') : (alloc.url || 'N/A');
-      const dLink = alloc.driveUrl || 'N/A';
+    flatTasks.forEach((taskItem) => {
+      const hex = taskItem.employeeColor || '#ffffff';
+      const refUrls = taskItem.urls && taskItem.urls.length > 0 ? taskItem.urls.join(', ') : 'N/A';
+      const dLink = taskItem.driveUrl || 'N/A';
       
-      let statusText = 'Allocated';
-      if (alloc.status === 'completed' || alloc.archived === true) {
-        statusText = 'Completed';
-      } else if (alloc.status === 'incompleted') {
-        statusText = 'Incompleted';
-      }
+      const statusText = taskItem.status.charAt(0).toUpperCase() + taskItem.status.slice(1);
       
       tableRows += `
         <tr style="background-color: ${hex}; height: 28px;">
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; font-weight: 500; height: 28px; vertical-align: middle;">${alloc.employeeName}</td>
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${alloc.clientName}</td>
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; text-transform: capitalize; height: 28px; vertical-align: middle;">${alloc.type}</td>
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${alloc.date}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; font-weight: 500; height: 28px; vertical-align: middle;">${taskItem.employeeName}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${taskItem.clientName}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; text-transform: capitalize; height: 28px; vertical-align: middle;">${taskItem.type}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${taskItem.date}</td>
           <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${refUrls}</td>
           <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${dLink}</td>
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${alloc.remark || 'N/A'}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${taskItem.remark || 'N/A'}</td>
           <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${statusText}</td>
         </tr>
       `;
@@ -186,7 +235,7 @@ export default function ReportExport() {
             <col width="280" />
             <col width="240" />
             <col width="130" />
-          </colgroup>
+          </</colgroup>
           <thead>
             <tr>
               <th>Employee Name</th>
@@ -218,21 +267,21 @@ export default function ReportExport() {
 
   // Download logic 2: Clean standard XLSX using SheetJS
   const downloadStandardExcel = () => {
-    if (filteredData.length === 0) {
+    if (flatTasks.length === 0) {
       alert('No data available to export.');
       return;
     }
 
-    const dataToExport = filteredData.map(alloc => ({
-      'Employee Name': alloc.employeeName,
-      'Client Name': alloc.clientName,
-      'Work Type': alloc.type.toUpperCase(),
-      'Allocation Date': alloc.date,
-      'Reference URLs': alloc.urls && alloc.urls.length > 0 ? alloc.urls.join(', ') : (alloc.url || 'N/A'),
-      'Google Drive Link': alloc.driveUrl || 'N/A',
-      'Remarks': alloc.remark || 'N/A',
-      'Status': (alloc.status === 'completed' || alloc.archived === true) ? 'Completed' : (alloc.status === 'incompleted' ? 'Incompleted' : 'Allocated'),
-      'Created At': alloc.createdAt ? new Date(alloc.createdAt).toLocaleString() : 'N/A'
+    const dataToExport = flatTasks.map(taskItem => ({
+      'Employee Name': taskItem.employeeName,
+      'Client Name': taskItem.clientName,
+      'Work Type': taskItem.type.toUpperCase(),
+      'Allocation Date': taskItem.date,
+      'Reference URLs': taskItem.urls && taskItem.urls.length > 0 ? taskItem.urls.join(', ') : 'N/A',
+      'Google Drive Link': taskItem.driveUrl || 'N/A',
+      'Remarks': taskItem.remark || 'N/A',
+      'Status': taskItem.status.charAt(0).toUpperCase() + taskItem.status.slice(1),
+      'Created At': taskItem.createdAt ? new Date(taskItem.createdAt).toLocaleString() : 'N/A'
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -251,14 +300,13 @@ export default function ReportExport() {
           }
         }
       });
-      // wch is width in characters: maximum string length + 4 for safety padding, with minimum 15 for good spacing
       cols.push({ wch: Math.max(maxLength + 4, 15) });
     });
     worksheet['!cols'] = cols;
 
     // Set row heights to give comfortable vertical spacing
     const rows = [
-      { hpt: 28 }, // Header row (taller and premium spaced)
+      { hpt: 28 }, // Header row
       ...dataToExport.map(() => ({ hpt: 22 })) // Data rows
     ];
     worksheet['!rows'] = rows;
@@ -279,72 +327,35 @@ export default function ReportExport() {
     XLSX.writeFile(workbook, filename);
   };
 
-  const createDownloadLink = (href, filename) => {
-    const link = document.createElement('a');
-    link.href = href;
-    link.download = filename;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    if (typeof link.click === 'function') {
-      link.click();
-    } else {
-      const clickEvent = new MouseEvent('click', {
-        view: window,
-        bubbles: true,
-        cancelable: true,
-      });
-      link.dispatchEvent(clickEvent);
-    }
-    document.body.removeChild(link);
-  };
-
   // Download logic 3: Share report directly to WhatsApp
   const shareOnWhatsApp = () => {
-    if (filteredData.length === 0) {
+    if (flatTasks.length === 0) {
       alert('No data available to share.');
       return;
     }
 
-    // Header metadata
-    let targetText = '';
-    if (filterType === 'client') {
-      targetText = selectedClientId === 'all' 
-        ? 'All Clients' 
-        : clients.find(c => c.id === selectedClientId)?.name || 'N/A';
-    } else {
-      targetText = selectedEmpId === 'all' 
-        ? 'All Employees' 
-        : employees.find(e => e.id === selectedEmpId)?.name || 'N/A';
-    }
-
-    let message = `*WORK ALLOCATION REPORT*\n`;
-    message += `*Target:* ${targetText}\n`;
-    message += `*Scope:* ${dateRangeType.toUpperCase()} (${referenceDate})\n`;
-    message += `*Total Allocations:* ${filteredData.length} records\n`;
-    message += `-----------------------------------------\n\n`;
-
-    filteredData.forEach((alloc, index) => {
-      const resolvedStatus = (alloc.status === 'completed' || alloc.archived === true) 
-        ? 'Completed' 
-        : (alloc.status === 'incompleted' ? 'Incompleted' : 'Allocated');
-
-      const refUrls = alloc.urls && alloc.urls.length > 0 
-        ? alloc.urls.join(', ') 
-        : (alloc.url || 'N/A');
+    let message = '';
+    flatTasks.forEach((taskItem, index) => {
+      const resolvedStatus = taskItem.status.charAt(0).toUpperCase() + taskItem.status.slice(1);
+      const refUrls = taskItem.urls && taskItem.urls.length > 0 
+        ? taskItem.urls.join(', ') 
+        : 'N/A';
         
-      message += `*${index + 1}. Employee:* ${alloc.employeeName}\n`;
-      message += `• *Client:* ${alloc.clientName}\n`;
-      message += `• *Work Type:* ${alloc.type.toUpperCase()}\n`;
-      message += `• *Scheduled Date:* ${alloc.date}\n`;
+      if (flatTasks.length > 1) {
+        message += `*Task ${index + 1}:*\n`;
+      }
+      message += `• *Client:* ${taskItem.clientName}\n`;
+      message += `• *Work Type:* ${taskItem.type.toUpperCase()}\n`;
+      message += `• *Scheduled Date:* ${taskItem.date}\n`;
       message += `• *Status:* ${resolvedStatus}\n`;
-      if (alloc.driveUrl) {
-        message += `• *Google Drive Link:* ${alloc.driveUrl}\n`;
+      if (taskItem.driveUrl) {
+        message += `• *Google Drive Link:* ${taskItem.driveUrl}\n`;
       }
       if (refUrls && refUrls !== 'N/A') {
         message += `• *Reference URLs:* ${refUrls}\n`;
       }
-      if (alloc.remark) {
-        message += `• *Remarks:* ${alloc.remark}\n`;
+      if (taskItem.remark) {
+        message += `• *Remarks:* ${taskItem.remark}\n`;
       }
       message += `-----------------------------------------\n\n`;
     });
@@ -354,9 +365,33 @@ export default function ReportExport() {
     window.open(whatsappUrl, '_blank');
   };
 
-  // Quick statistics helper
-  const uniqueEmployeeCount = [...new Set(filteredData.map(a => a.employeeId))].length;
-  const uniqueClientCount = [...new Set(filteredData.map(a => a.clientId))].length;
+  const shareTaskOnWhatsApp = (taskItem) => {
+    const resolvedStatus = taskItem.status.charAt(0).toUpperCase() + taskItem.status.slice(1);
+    const refUrls = taskItem.urls && taskItem.urls.length > 0 ? taskItem.urls.join(', ') : 'N/A';
+
+    let message = '';
+    message += `• *Client:* ${taskItem.clientName}\n`;
+    message += `• *Work Type:* ${taskItem.type.toUpperCase()}\n`;
+    message += `• *Scheduled Date:* ${taskItem.date}\n`;
+    message += `• *Status:* ${resolvedStatus}\n`;
+    if (taskItem.driveUrl) {
+      message += `• *Google Drive Link:* ${taskItem.driveUrl}\n`;
+    }
+    if (refUrls && refUrls !== 'N/A') {
+      message += `• *Reference URLs:* ${refUrls}\n`;
+    }
+    if (taskItem.remark) {
+      message += `• *Remarks:* ${taskItem.remark}\n`;
+    }
+    message += `-----------------------------------------\n\n`;
+
+    const encodedText = encodeURIComponent(message);
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  const uniqueEmployeeCount = [...new Set(flatTasks.map(a => a.employeeId))].length;
+  const uniqueClientCount = [...new Set(flatTasks.map(a => a.clientId))].length;
 
   return (
     <div className="space-y-8">
@@ -390,7 +425,7 @@ export default function ReportExport() {
                     setFilterType('client');
                     setSelectedEmpId('all');
                   }}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition ${
+                  className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     filterType === 'client' 
                       ? 'bg-indigo-600 text-white shadow-xs' 
                       : 'text-slate-500 hover:text-slate-800'
@@ -403,7 +438,7 @@ export default function ReportExport() {
                     setFilterType('employee');
                     setSelectedClientId('all');
                   }}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition ${
+                  className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     filterType === 'employee' 
                       ? 'bg-indigo-600 text-white shadow-xs' 
                       : 'text-slate-500 hover:text-slate-800'
@@ -484,10 +519,10 @@ export default function ReportExport() {
 
         {/* DATA PREVIEW & EXPORT ACTIONS */}
         <div className="lg:col-span-3 bg-white border border-slate-200/80 rounded-2xl p-6 flex flex-col space-y-6 shadow-sm">
-          {/* Header block with Preview details and all 4 download options */}
+          {/* Header block with Preview details and export buttons */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
             <div>
-              <h2 className="text-base font-bold text-slate-900">Report Preview ({filteredData.length} records)</h2>
+              <h2 className="text-base font-bold text-slate-900">Report Preview ({flatTasks.length} tasks)</h2>
               <p className="text-slate-500 text-xs mt-0.5">Previewing matching allocations (including archives).</p>
             </div>
 
@@ -508,14 +543,6 @@ export default function ReportExport() {
               >
                 <FileSpreadsheet className="h-3.5 w-3.5" />
                 <span>Standard XLSX</span>
-              </button>
-              <button
-                onClick={shareOnWhatsApp}
-                className="flex items-center space-x-1.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-550 text-white font-semibold py-2 px-3 rounded-xl text-xs transition shadow-md shadow-emerald-700/10 cursor-pointer"
-                title="Share formatted allocation report directly to WhatsApp contacts"
-              >
-                <Share2 className="h-3.5 w-3.5" />
-                <span>Share WhatsApp</span>
               </button>
             </div>
           </div>
@@ -545,8 +572,8 @@ export default function ReportExport() {
             {/* Quick Statistics Row */}
             <div className="grid grid-cols-3 gap-4 bg-slate-50 border border-slate-200/80 p-4 rounded-xl text-center">
               <div>
-                <span className="block text-slate-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Allocations</span>
-                <span className="text-lg sm:text-xl font-black text-slate-800">{filteredData.length}</span>
+                <span className="block text-slate-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Tasks</span>
+                <span className="text-lg sm:text-xl font-black text-slate-800">{flatTasks.length}</span>
               </div>
               <div className="border-x border-slate-200">
                 <span className="block text-slate-500 text-[10px] font-semibold uppercase tracking-wider mb-1">Employees</span>
@@ -570,51 +597,52 @@ export default function ReportExport() {
                     <th className="p-3">Links & Drive</th>
                     <th className="p-3">Remarks</th>
                     <th className="p-3 text-center">Status</th>
+                    <th className="p-3 text-center">Share</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200/60 text-slate-700">
-                  {filteredData.length === 0 ? (
+                  {flatTasks.length === 0 ? (
                     <tr>
                       <td colSpan="7" className="text-center py-12 text-slate-400">
                         No matching records found.
                       </td>
                     </tr>
                   ) : (
-                    filteredData.map((alloc) => (
+                    flatTasks.map((taskItem) => (
                       <tr 
-                        key={alloc.id} 
+                        key={taskItem.id} 
                         className="hover:bg-slate-50/50 transition duration-150"
                       >
                         <td className="p-3">
                           <div className="flex items-center space-x-2">
                             <span 
                               className="inline-block w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" 
-                              style={{ backgroundColor: alloc.employeeColor }}
+                              style={{ backgroundColor: taskItem.employeeColor }}
                             />
-                            <span className="font-semibold text-slate-800">{alloc.employeeName}</span>
+                            <span className="font-semibold text-slate-800">{taskItem.employeeName}</span>
                           </div>
                         </td>
                         <td className="p-3 font-medium text-slate-700">
-                          {alloc.clientName}
+                          {taskItem.clientName}
                         </td>
                         <td className="p-3 text-xs capitalize">
                           <span className={`inline-flex px-2 py-0.5 font-medium rounded-full ${
-                            alloc.type === 'story' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                            alloc.type === 'reel' ? 'bg-pink-50 text-pink-700 border border-pink-200' :
+                            taskItem.type === 'story' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                            taskItem.type === 'reel' ? 'bg-pink-50 text-pink-700 border border-pink-200' :
                             'bg-sky-50 text-sky-700 border border-sky-200'
                           }`}>
-                            {alloc.type}
+                            {taskItem.type}
                           </span>
                         </td>
                         <td className="p-3 font-mono text-xs text-slate-500 font-semibold">
-                          {alloc.date}
+                          {taskItem.date}
                         </td>
                         <td className="p-3 text-xs">
                           <div className="flex flex-col space-y-1">
                             {/* Render Google Drive Link */}
-                            {alloc.driveUrl && (
+                            {taskItem.driveUrl && (
                               <a 
-                                href={alloc.driveUrl} 
+                                href={taskItem.driveUrl} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center text-emerald-700 hover:text-emerald-800 hover:underline font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 w-fit"
@@ -625,13 +653,12 @@ export default function ReportExport() {
                             )}
                             {/* Render Reference URLs */}
                             {(() => {
-                              const rowUrls = alloc.urls || (alloc.url ? [alloc.url] : []);
-                              if (rowUrls.length === 0) {
-                                return !alloc.driveUrl && <span className="text-slate-400 italic">No links</span>;
+                              if (!taskItem.urls || taskItem.urls.length === 0) {
+                                return !taskItem.driveUrl && <span className="text-slate-400 italic">No links</span>;
                               }
                               return (
                                 <div className="flex flex-wrap gap-1">
-                                  {rowUrls.map((lnk, idx) => (
+                                  {taskItem.urls.map((lnk, idx) => (
                                     <a 
                                       key={idx}
                                       href={lnk} 
@@ -639,7 +666,7 @@ export default function ReportExport() {
                                       rel="noopener noreferrer"
                                       className="inline-flex items-center text-indigo-700 hover:text-indigo-800 hover:underline font-semibold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200"
                                     >
-                                      <span>Ref {rowUrls.length > 1 ? idx + 1 : ''}</span>
+                                      <span>Ref {taskItem.urls.length > 1 ? idx + 1 : ''}</span>
                                       <ExternalLink className="h-3 w-3 ml-1" />
                                     </a>
                                   ))}
@@ -648,41 +675,58 @@ export default function ReportExport() {
                             })()}
                           </div>
                         </td>
-                        <td className="p-3 max-w-xs truncate text-slate-500" title={alloc.remark}>
-                          {alloc.remark || <span className="text-slate-400 italic">No remarks</span>}
+                        <td className="p-3 max-w-xs truncate text-slate-500" title={taskItem.remark}>
+                          {taskItem.remark || <span className="text-slate-400 italic">No remarks</span>}
                         </td>
                         <td className="p-3 text-center">
-                          {(() => {
-                            const resolvedStatus = (alloc.status === 'completed' || alloc.archived === true) 
-                              ? 'completed' 
-                              : (alloc.status === 'incompleted' ? 'incompleted' : 'allocated');
-                            return (
-                              <select
-                                value={resolvedStatus}
-                                onChange={async (e) => {
-                                  try {
-                                    const nextStatus = e.target.value;
-                                    await updateDoc(doc(db, 'content_reports', 'data', 'allocations', alloc.id), {
-                                      status: nextStatus,
-                                      archived: nextStatus === 'completed'
-                                    });
-                                  } catch (err) {
-                                    console.error(err);
-                                    alert('Failed to update status.');
-                                  }
-                                }}
-                                className={`status-select inline-flex px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider cursor-pointer border transition duration-150 focus:outline-none focus:ring-1 focus:ring-slate-300 ${
-                                  resolvedStatus === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                  resolvedStatus === 'incompleted' ? 'bg-red-50 text-red-750 border-red-200' :
-                                  'bg-blue-50 text-blue-700 border-blue-200'
-                                }`}
-                              >
-                                <option value="allocated" className="bg-white text-slate-800">Allocated</option>
-                                <option value="completed" className="bg-white text-slate-800">Completed</option>
-                                <option value="incompleted" className="bg-white text-slate-800">Incompleted</option>
-                              </select>
-                            );
-                          })()}
+                          <select
+                            value={taskItem.status}
+                            onChange={async (e) => {
+                              try {
+                                const nextStatus = e.target.value;
+                                const parent = taskItem.parentAlloc;
+
+                                if (taskItem.isLegacy) {
+                                  await updateDoc(doc(db, 'content_reports', 'data', 'allocations', taskItem.allocationId), {
+                                    status: nextStatus,
+                                    archived: nextStatus === 'completed'
+                                  });
+                                } else {
+                                  const updatedTasks = [...parent.tasks];
+                                  updatedTasks[taskItem.taskIndex].status = nextStatus;
+
+                                  const allCompleted = updatedTasks.every(t => t.status === 'completed');
+
+                                  await updateDoc(doc(db, 'content_reports', 'data', 'allocations', taskItem.allocationId), {
+                                    tasks: updatedTasks,
+                                    status: allCompleted ? 'completed' : 'allocated',
+                                    archived: allCompleted
+                                  });
+                                }
+                              } catch (err) {
+                                console.error(err);
+                                alert('Failed to update status.');
+                              }
+                            }}
+                            className={`status-select inline-flex px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider cursor-pointer border transition duration-150 focus:outline-none focus:ring-1 focus:ring-slate-300 ${
+                              taskItem.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                              taskItem.status === 'incompleted' ? 'bg-red-50 text-red-750 border-red-200' :
+                              'bg-blue-50 text-blue-700 border-blue-200'
+                            }`}
+                          >
+                            <option value="allocated" className="bg-white text-slate-800">Allocated</option>
+                            <option value="completed" className="bg-white text-slate-800">Completed</option>
+                            <option value="incompleted" className="bg-white text-slate-800">Incompleted</option>
+                          </select>
+                        </td>
+                        <td className="p-3 text-center">
+                          <button
+                            onClick={() => shareTaskOnWhatsApp(taskItem)}
+                            className="inline-flex items-center justify-center p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 rounded-lg transition duration-150 shadow-xs cursor-pointer"
+                            title={`Share this task on WhatsApp`}
+                          >
+                            <Share2 className="h-3.5 w-3.5" />
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -696,4 +740,3 @@ export default function ReportExport() {
     </div>
   );
 }
-
