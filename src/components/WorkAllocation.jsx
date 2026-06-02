@@ -16,14 +16,13 @@ export default function WorkAllocation() {
   
   // Form states
   const [selectedEmpId, setSelectedEmpId] = useState('');
-  const [selectedClientId, setSelectedClientId] = useState('');
   const [allocationDate, setAllocationDate] = useState(
     new Date().toLocaleDateString('en-CA') // YYYY-MM-DD format
   );
 
   // Multiple tasks state in creation form
   const [tasks, setTasks] = useState([
-    { type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }
+    { clientId: '', type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }
   ]);
 
   // Table states
@@ -35,7 +34,6 @@ export default function WorkAllocation() {
   // Editing state
   const [editingAlloc, setEditingAlloc] = useState(null);
   const [editEmpId, setEditEmpId] = useState('');
-  const [editClientId, setEditClientId] = useState('');
   const [editDate, setEditDate] = useState('');
   const [editTasks, setEditTasks] = useState([]);
 
@@ -78,7 +76,7 @@ export default function WorkAllocation() {
 
   // Handlers for dynamic tasks in Creation form
   const handleAddTask = () => {
-    setTasks([...tasks, { type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
+    setTasks([...tasks, { clientId: '', type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
   };
 
   const handleRemoveTask = (index) => {
@@ -111,7 +109,7 @@ export default function WorkAllocation() {
 
   // Handlers for dynamic tasks in Edit form
   const handleAddEditTask = () => {
-    setEditTasks([...editTasks, { type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
+    setEditTasks([...editTasks, { clientId: '', type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
   };
 
   const handleRemoveEditTask = (index) => {
@@ -144,6 +142,8 @@ export default function WorkAllocation() {
 
   const shareRowOnWhatsApp = (alloc) => {
     const rowTasks = alloc.tasks && alloc.tasks.length > 0 ? alloc.tasks : [{
+      clientId: alloc.clientId || '',
+      clientName: alloc.clientName || '',
       type: alloc.type || 'story',
       urls: alloc.urls || (alloc.url ? [alloc.url] : []),
       driveUrl: alloc.driveUrl || '',
@@ -159,7 +159,7 @@ export default function WorkAllocation() {
       if (rowTasks.length > 1) {
         message += `*Task ${index + 1}:*\n`;
       }
-      message += `• *Client:* ${alloc.clientName}\n`;
+      message += `• *Client:* ${t.clientName || alloc.clientName}\n`;
       message += `• *Work Type:* ${t.type.toUpperCase()}\n`;
       message += `• *Scheduled Date:* ${alloc.date}\n`;
       message += `• *Status:* ${resolvedStatus}\n`;
@@ -182,8 +182,13 @@ export default function WorkAllocation() {
 
   const handleCreateAllocation = async (e) => {
     e.preventDefault();
-    if (!selectedEmpId || !selectedClientId) {
-      setError('Please select both an employee and a client.');
+    if (!selectedEmpId) {
+      setError('Please select an employee.');
+      return;
+    }
+    const hasUnselectedClient = tasks.some(t => !t.clientId);
+    if (hasUnselectedClient) {
+      setError('Please select a client for all tasks.');
       return;
     }
     setLoading(true);
@@ -191,24 +196,30 @@ export default function WorkAllocation() {
     setSuccess('');
 
     const emp = employees.find(e => e.id === selectedEmpId);
-    const client = clients.find(c => c.id === selectedClientId);
 
     // Clean up blank urls, trim strings for all tasks
-    const cleanedTasks = tasks.map(t => ({
-      type: t.type,
-      urls: t.urls.map(u => u.trim()).filter(u => u !== ''),
-      driveUrl: t.driveUrl.trim(),
-      remark: t.remark.trim(),
-      status: 'allocated'
-    }));
+    const cleanedTasks = tasks.map(t => {
+      const client = clients.find(c => c.id === t.clientId);
+      return {
+        clientId: t.clientId,
+        clientName: client ? client.name : '',
+        type: t.type,
+        urls: t.urls.map(u => u.trim()).filter(u => u !== ''),
+        driveUrl: t.driveUrl.trim(),
+        remark: t.remark.trim(),
+        status: 'allocated'
+      };
+    });
+
+    const combinedClientNames = [...new Set(cleanedTasks.map(t => t.clientName))].join(', ');
 
     try {
       await addDoc(collection(db, 'content_reports', 'data', 'allocations'), {
         employeeId: selectedEmpId,
         employeeName: emp.name,
         employeeColor: emp.color || '#94a3b8',
-        clientId: selectedClientId,
-        clientName: client.name,
+        clientId: tasks[0].clientId,
+        clientName: combinedClientNames,
         tasks: cleanedTasks,
         date: allocationDate,
         status: 'allocated',
@@ -217,7 +228,7 @@ export default function WorkAllocation() {
       });
 
       setSuccess('Work entry allocated successfully.');
-      setTasks([{ type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
+      setTasks([{ clientId: '', type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
       // Auto dismiss success after 3s
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -231,15 +242,21 @@ export default function WorkAllocation() {
   const handleOpenEdit = (alloc) => {
     setEditingAlloc(alloc);
     setEditEmpId(alloc.employeeId);
-    setEditClientId(alloc.clientId);
     setEditDate(alloc.date);
     
     // Support backward compatibility if older records don't have tasks list
     if (alloc.tasks && alloc.tasks.length > 0) {
-      setEditTasks(JSON.parse(JSON.stringify(alloc.tasks)));
+      const tasksCopy = alloc.tasks.map(t => ({
+        ...t,
+        clientId: t.clientId || alloc.clientId || '',
+        clientName: t.clientName || alloc.clientName || ''
+      }));
+      setEditTasks(tasksCopy);
     } else {
       const existingUrls = alloc.urls || (alloc.url ? [alloc.url] : ['']);
       setEditTasks([{
+        clientId: alloc.clientId || '',
+        clientName: alloc.clientName || '',
         type: alloc.type || 'story',
         urls: existingUrls.length > 0 ? existingUrls : [''],
         driveUrl: alloc.driveUrl || '',
@@ -251,27 +268,38 @@ export default function WorkAllocation() {
 
   const handleUpdateAllocation = async (e) => {
     e.preventDefault();
-    if (!editEmpId || !editClientId) return;
+    if (!editEmpId) return;
+    const hasUnselectedClient = editTasks.some(t => !t.clientId);
+    if (hasUnselectedClient) {
+      setError('Please select a client for all tasks.');
+      return;
+    }
     setLoading(true);
 
     const emp = employees.find(e => e.id === editEmpId);
-    const client = clients.find(c => c.id === editClientId);
 
-    const cleanedTasks = editTasks.map(t => ({
-      type: t.type,
-      urls: t.urls.map(u => u.trim()).filter(u => u !== ''),
-      driveUrl: t.driveUrl.trim(),
-      remark: t.remark.trim(),
-      status: t.status || 'allocated'
-    }));
+    const cleanedTasks = editTasks.map(t => {
+      const client = clients.find(c => c.id === t.clientId);
+      return {
+        clientId: t.clientId,
+        clientName: client ? client.name : t.clientName,
+        type: t.type,
+        urls: t.urls.map(u => u.trim()).filter(u => u !== ''),
+        driveUrl: t.driveUrl.trim(),
+        remark: t.remark.trim(),
+        status: t.status || 'allocated'
+      };
+    });
+
+    const combinedClientNames = [...new Set(cleanedTasks.map(t => t.clientName))].join(', ');
 
     try {
       await updateDoc(doc(db, 'content_reports', 'data', 'allocations', editingAlloc.id), {
         employeeId: editEmpId,
         employeeName: emp.name,
         employeeColor: emp.color || '#94a3b8',
-        clientId: editClientId,
-        clientName: client.name,
+        clientId: editTasks[0].clientId,
+        clientName: combinedClientNames,
         tasks: cleanedTasks,
         date: editDate,
       });
@@ -320,7 +348,7 @@ export default function WorkAllocation() {
     // Check main properties
     const mainMatch = (
       alloc.employeeName.toLowerCase().includes(term) ||
-      alloc.clientName.toLowerCase().includes(term) ||
+      (alloc.clientName && alloc.clientName.toLowerCase().includes(term)) ||
       alloc.date.includes(term)
     );
 
@@ -328,13 +356,16 @@ export default function WorkAllocation() {
 
     // Check tasks list
     const tasksToSearch = alloc.tasks && alloc.tasks.length > 0 ? alloc.tasks : [{
+      clientId: alloc.clientId || '',
+      clientName: alloc.clientName || '',
       type: alloc.type || '',
       remark: alloc.remark || ''
     }];
 
     return tasksToSearch.some(t => 
       t.type.toLowerCase().includes(term) ||
-      t.remark.toLowerCase().includes(term)
+      t.remark.toLowerCase().includes(term) ||
+      (t.clientName && t.clientName.toLowerCase().includes(term))
     );
   });
 
@@ -405,23 +436,6 @@ export default function WorkAllocation() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                    Select Client
-                  </label>
-                  <select
-                    required
-                    value={selectedClientId}
-                    onChange={(e) => setSelectedClientId(e.target.value)}
-                    className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  >
-                    <option value="">-- Choose Client --</option>
-                    {clients.map(cl => (
-                      <option key={cl.id} value={cl.id}>{cl.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
                     Schedule Date
                   </label>
                   <input
@@ -455,7 +469,7 @@ export default function WorkAllocation() {
                         <button
                           type="button"
                           onClick={() => handleRemoveTask(taskIdx)}
-                          className="absolute top-3 right-3 text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                          className="absolute top-3 right-3 text-red-500 hover:text-red-705 p-1 rounded-lg hover:bg-red-50 transition cursor-pointer"
                           title="Remove Task"
                         >
                           <Trash className="h-4 w-4" />
@@ -463,6 +477,23 @@ export default function WorkAllocation() {
                       )}
 
                       <span className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider">Task #{taskIdx + 1}</span>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Select Client
+                        </label>
+                        <select
+                          required
+                          value={task.clientId || ''}
+                          onChange={(e) => handleUpdateTaskField(taskIdx, 'clientId', e.target.value)}
+                          className="block w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        >
+                          <option value="">-- Choose Client --</option>
+                          {clients.map(cl => (
+                            <option key={cl.id} value={cl.id}>{cl.name}</option>
+                          ))}
+                        </select>
+                      </div>
 
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -610,6 +641,8 @@ export default function WorkAllocation() {
                 ) : (
                   filteredAllocations.map((alloc) => {
                     const rowTasks = alloc.tasks && alloc.tasks.length > 0 ? alloc.tasks : [{
+                      clientId: alloc.clientId || '',
+                      clientName: alloc.clientName || '',
                       type: alloc.type || 'story',
                       urls: alloc.urls || (alloc.url ? [alloc.url] : []),
                       driveUrl: alloc.driveUrl || '',
@@ -631,8 +664,14 @@ export default function WorkAllocation() {
                             <span className="font-semibold text-slate-800">{alloc.employeeName}</span>
                           </div>
                         </td>
-                        <td className="p-3.5 font-medium text-slate-700">
-                          {alloc.clientName}
+                        <td className="p-3.5 font-medium text-slate-707">
+                          {(() => {
+                            if (alloc.tasks && alloc.tasks.length > 0) {
+                              const uniqueClients = [...new Set(alloc.tasks.map(t => t.clientName).filter(Boolean))];
+                              return uniqueClients.join(', ') || alloc.clientName;
+                            }
+                            return alloc.clientName;
+                          })()}
                         </td>
                         <td className="p-3.5">
                           <div className="flex flex-col gap-1">
@@ -656,11 +695,16 @@ export default function WorkAllocation() {
                           <div className="space-y-3">
                             {rowTasks.map((t, idx) => (
                               <div key={idx} className={`${rowTasks.length > 1 ? 'pb-2 border-b border-slate-100 last:pb-0 last:border-0' : ''}`}>
-                                {rowTasks.length > 1 && (
-                                  <span className="block text-[10px] font-extrabold text-slate-400 uppercase mb-1">
-                                    Task #{idx + 1} ({t.type})
+                                <div className="flex flex-wrap gap-1.5 items-center mb-1">
+                                  {rowTasks.length > 1 && (
+                                    <span className="text-[10px] font-extrabold text-slate-400 uppercase">
+                                      Task #{idx + 1} ({t.type})
+                                    </span>
+                                  )}
+                                  <span className="inline-flex px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-100 text-[9px] font-bold text-indigo-700">
+                                    Client: {t.clientName || alloc.clientName || 'N/A'}
                                   </span>
-                                )}
+                                </div>
                                 <div className="flex flex-wrap gap-1.5 items-center">
                                   {t.driveUrl && (
                                     <a 
@@ -782,22 +826,6 @@ export default function WorkAllocation() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                    Client
-                  </label>
-                  <select
-                    required
-                    value={editClientId}
-                    onChange={(e) => setEditClientId(e.target.value)}
-                    className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  >
-                    {clients.map(cl => (
-                      <option key={cl.id} value={cl.id}>{cl.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
                     Date
                   </label>
                   <input
@@ -831,7 +859,7 @@ export default function WorkAllocation() {
                         <button
                           type="button"
                           onClick={() => handleRemoveEditTask(taskIdx)}
-                          className="absolute top-2.5 right-2.5 text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                          className="absolute top-2.5 right-2.5 text-red-500 hover:text-red-707 p-1 rounded-lg hover:bg-red-50 transition cursor-pointer"
                           title="Remove Task"
                         >
                           <Trash className="h-3.5 w-3.5" />
@@ -839,6 +867,23 @@ export default function WorkAllocation() {
                       )}
 
                       <span className="block text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Task #{taskIdx + 1}</span>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Select Client
+                        </label>
+                        <select
+                          required
+                          value={task.clientId || ''}
+                          onChange={(e) => handleUpdateEditTaskField(taskIdx, 'clientId', e.target.value)}
+                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        >
+                          <option value="">-- Choose Client --</option>
+                          {clients.map(cl => (
+                            <option key={cl.id} value={cl.id}>{cl.name}</option>
+                          ))}
+                        </select>
+                      </div>
 
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">

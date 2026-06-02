@@ -83,7 +83,13 @@ export default function ReportExport() {
     // 1. Apply Entity Filters
     if (filterType === 'client') {
       if (selectedClientId !== 'all') {
-        result = result.filter(a => a.clientId === selectedClientId);
+        result = result.filter(a => {
+          if (a.clientId === selectedClientId) return true;
+          if (a.tasks && a.tasks.length > 0) {
+            return a.tasks.some(t => t.clientId === selectedClientId);
+          }
+          return false;
+        });
       }
     } else {
       if (selectedEmpId !== 'all') {
@@ -111,14 +117,22 @@ export default function ReportExport() {
     filteredData.forEach(alloc => {
       if (alloc.tasks && alloc.tasks.length > 0) {
         alloc.tasks.forEach((t, index) => {
+          const tClientId = t.clientId || alloc.clientId;
+          const tClientName = t.clientName || alloc.clientName;
+
+          // If filtering by client, and it is not "all", only include matching client tasks
+          if (filterType === 'client' && selectedClientId !== 'all' && tClientId !== selectedClientId) {
+            return;
+          }
+
           tasksList.push({
             id: `${alloc.id}_task_${index}`,
             allocationId: alloc.id,
             employeeId: alloc.employeeId,
             employeeName: alloc.employeeName,
             employeeColor: alloc.employeeColor,
-            clientId: alloc.clientId,
-            clientName: alloc.clientName,
+            clientId: tClientId,
+            clientName: tClientName,
             date: alloc.date,
             createdAt: alloc.createdAt,
             archived: alloc.archived,
@@ -134,14 +148,21 @@ export default function ReportExport() {
         });
       } else {
         // Legacy support
+        const tClientId = alloc.clientId;
+        const tClientName = alloc.clientName;
+
+        if (filterType === 'client' && selectedClientId !== 'all' && tClientId !== selectedClientId) {
+          return;
+        }
+
         tasksList.push({
           id: alloc.id,
           allocationId: alloc.id,
           employeeId: alloc.employeeId,
           employeeName: alloc.employeeName,
           employeeColor: alloc.employeeColor,
-          clientId: alloc.clientId,
-          clientName: alloc.clientName,
+          clientId: tClientId,
+          clientName: tClientName,
           date: alloc.date,
           createdAt: alloc.createdAt,
           archived: alloc.archived,
@@ -157,7 +178,7 @@ export default function ReportExport() {
       }
     });
     setFlatTasks(tasksList);
-  }, [filteredData]);
+  }, [filteredData, filterType, selectedClientId]);
 
   // Download logic 1: Excel using XML template that preserves CSS color styling (highly requested)
   const downloadColorExcel = () => {
