@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, getDocs, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { Plus, UserPlus, FolderPlus, Trash2, User, Briefcase, ShieldAlert } from 'lucide-react';
+import { Plus, UserPlus, FolderPlus, Trash2, User, Briefcase, ShieldAlert, Layers } from 'lucide-react';
 
 const PALETTE = [
   { name: 'Rose', hex: '#FFE4E6', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
@@ -17,6 +17,7 @@ const PALETTE = [
 export default function ManageEntities() {
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
+  const [postTypes, setPostTypes] = useState([]);
 
   // Form states
   const [empName, setEmpName] = useState('');
@@ -26,11 +27,14 @@ export default function ManageEntities() {
   const [clientName, setClientName] = useState('');
   const [clientIndustry, setClientIndustry] = useState('');
 
+  const [postTypeName, setPostTypeName] = useState('');
+
   const [loadingEmp, setLoadingEmp] = useState(false);
   const [loadingClient, setLoadingClient] = useState(false);
+  const [loadingPostType, setLoadingPostType] = useState(false);
   const [error, setError] = useState('');
 
-  // Fetch employees and clients using real-time listeners
+  // Fetch employees, clients, and post types using real-time listeners
   useEffect(() => {
     const qEmp = query(collection(db, 'content_reports', 'data', 'employees'), orderBy('name', 'asc'));
     const unsubscribeEmp = onSnapshot(qEmp, (snapshot) => {
@@ -44,9 +48,42 @@ export default function ManageEntities() {
       setClients(cls);
     });
 
+    const qPost = query(collection(db, 'content_reports', 'data', 'post_types'), orderBy('name', 'asc'));
+    let isSeeding = false;
+    const unsubscribePost = onSnapshot(qPost, async (snapshot) => {
+      if (snapshot.empty && !isSeeding) {
+        isSeeding = true;
+        const defaults = [
+          { name: 'Story', value: 'story' },
+          { name: 'Reel', value: 'reel' },
+          { name: 'Post', value: 'post' },
+          { name: 'PDF', value: 'pdf' },
+          { name: 'Banner/Flyer', value: 'banner/flyer' },
+          { name: 'Printable', value: 'printable' },
+          { name: 'Logo/Vector', value: 'logo/vector' },
+        ];
+        try {
+          for (const item of defaults) {
+            await addDoc(collection(db, 'content_reports', 'data', 'post_types'), {
+              ...item,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        } catch (err) {
+          console.error('Failed to seed default post types:', err);
+        } finally {
+          isSeeding = false;
+        }
+      } else {
+        const pts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setPostTypes(pts);
+      }
+    });
+
     return () => {
       unsubscribeEmp();
       unsubscribeClient();
+      unsubscribePost();
     };
   }, []);
 
@@ -96,6 +133,30 @@ export default function ManageEntities() {
     }
   };
 
+  const handleAddPostType = async (e) => {
+    e.preventDefault();
+    if (!postTypeName.trim()) return;
+    setLoadingPostType(true);
+    setError('');
+
+    const cleanName = postTypeName.trim();
+    const cleanValue = cleanName.toLowerCase();
+
+    try {
+      await addDoc(collection(db, 'content_reports', 'data', 'post_types'), {
+        name: cleanName,
+        value: cleanValue,
+        createdAt: new Date().toISOString(),
+      });
+      setPostTypeName('');
+    } catch (err) {
+      console.error(err);
+      setError('Failed to add post type. Please try again.');
+    } finally {
+      setLoadingPostType(false);
+    }
+  };
+
   const handleDeleteEmployee = async (id, name) => {
     if (window.confirm(`Are you sure you want to delete employee "${name}"?`)) {
       try {
@@ -118,9 +179,32 @@ export default function ManageEntities() {
     }
   };
 
+  const handleDeletePostType = async (id, name) => {
+    if (window.confirm(`Are you sure you want to delete post type "${name}"?`)) {
+      try {
+        await deleteDoc(doc(db, 'content_reports', 'data', 'post_types', id));
+      } catch (err) {
+        console.error(err);
+        setError('Failed to delete post type.');
+      }
+    }
+  };
+
   // Find palette helper to apply color themes to UI cards
   const getTheme = (hex) => {
     return PALETTE.find(p => p.hex === hex) || PALETTE[0];
+  };
+
+  const getPostTheme = (value) => {
+    const val = (value || '').toLowerCase();
+    if (val === 'story') return { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' };
+    if (val === 'reel') return { bg: 'bg-pink-50', text: 'text-pink-700', border: 'border-pink-200' };
+    if (val === 'post') return { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' };
+    if (val === 'pdf') return { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' };
+    if (val.includes('banner') || val.includes('flyer')) return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
+    if (val === 'printable') return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
+    if (val.includes('logo') || val.includes('vector')) return { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' };
+    return { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' };
   };
 
   return (
@@ -142,8 +226,8 @@ export default function ManageEntities() {
         </div>
       )}
 
-      {/* Grid Layout: Stacks on mobile/tablet, 2 Columns on desktop */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Grid Layout: Stacks on mobile/tablet, 3 Columns on desktop */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         
         {/* EMPLOYEES PANEL */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-6 space-y-6 flex flex-col shadow-sm">
@@ -359,6 +443,91 @@ export default function ManageEntities() {
                     </button>
                   </div>
                 ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* POST TYPES PANEL */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 space-y-6 flex flex-col shadow-sm">
+          <div className="flex items-center space-x-3 pb-4 border-b border-slate-100">
+            <div className="p-2.5 bg-indigo-50 rounded-xl">
+              <Layers className="h-5 w-5 text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 leading-none">Add Post Type</h2>
+              <p className="text-slate-500 text-xs mt-1">Configure post types for work assignment.</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleAddPostType} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+                Post Type Name
+              </label>
+              <input
+                type="text"
+                required
+                value={postTypeName}
+                onChange={(e) => setPostTypeName(e.target.value)}
+                placeholder="E.g., PDF or Banner/Flyer"
+                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loadingPostType}
+              className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              {loadingPostType ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  <span>Create Post Type</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* List Section */}
+          <div className="flex-1 flex flex-col space-y-4 pt-4 border-t border-slate-100">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center justify-between">
+              <span>Active Post Types ({postTypes.length})</span>
+            </h3>
+            
+            <div className="space-y-2 overflow-y-auto max-h-80 pr-1">
+              {postTypes.length === 0 ? (
+                <div className="text-center py-8 border border-dashed border-slate-200 rounded-xl text-slate-400 text-sm">
+                  No post types created yet.
+                </div>
+              ) : (
+                postTypes.map((pt) => {
+                  const ptTheme = getPostTheme(pt.value);
+                  return (
+                    <div
+                      key={pt.id}
+                      className={`flex items-center justify-between p-3.5 rounded-xl border ${ptTheme.bg} ${ptTheme.border} transition duration-150`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 rounded-lg bg-white border border-slate-100 shadow-xs">
+                          <Layers className={`h-4 w-4 ${ptTheme.text}`} />
+                        </div>
+                        <div>
+                          <span className="font-semibold text-sm text-slate-900 block leading-snug">{pt.name}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeletePostType(pt.id, pt.name)}
+                        className="p-2 bg-white hover:bg-red-50 hover:text-red-600 border border-slate-200 hover:border-red-200 text-slate-400 rounded-lg transition duration-150 shadow-xs"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

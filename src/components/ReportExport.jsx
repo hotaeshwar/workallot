@@ -7,6 +7,22 @@ import {
   Download, RefreshCw, Layers, ExternalLink, Share2
 } from 'lucide-react';
 
+const getPostTypeBadgeStyle = (type) => {
+  const t = (type || '').toLowerCase();
+  if (t === 'story') return 'bg-purple-50 text-purple-700 border border-purple-200';
+  if (t === 'reel') return 'bg-pink-50 text-pink-700 border border-pink-200';
+  if (t === 'post') return 'bg-sky-50 text-sky-700 border border-sky-200';
+  if (t === 'pdf') return 'bg-rose-50 text-rose-700 border border-rose-200';
+  if (t.includes('banner') || t.includes('flyer')) {
+    return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+  }
+  if (t === 'printable') return 'bg-amber-50 text-amber-700 border border-amber-200';
+  if (t.includes('logo') || t.includes('vector')) {
+    return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
+  }
+  return 'bg-slate-50 text-slate-700 border border-slate-200';
+};
+
 export default function ReportExport() {
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
@@ -647,11 +663,7 @@ export default function ReportExport() {
                           {taskItem.clientName}
                         </td>
                         <td className="p-3 text-xs capitalize">
-                          <span className={`inline-flex px-2 py-0.5 font-medium rounded-full ${
-                            taskItem.type === 'story' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                            taskItem.type === 'reel' ? 'bg-pink-50 text-pink-700 border border-pink-200' :
-                            'bg-sky-50 text-sky-700 border border-sky-200'
-                          }`}>
+                          <span className={`inline-flex px-2 py-0.5 font-medium rounded-full capitalize ${getPostTypeBadgeStyle(taskItem.type)}`}>
                             {taskItem.type}
                           </span>
                         </td>

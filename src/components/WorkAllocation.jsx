@@ -9,10 +9,37 @@ import {
   CheckCircle, AlertCircle, RefreshCw, X, Save, Plus, Trash, Share2 
 } from 'lucide-react';
 
+const DEFAULT_POST_TYPES = [
+  { id: 'story', name: 'Story', value: 'story' },
+  { id: 'reel', name: 'Reel', value: 'reel' },
+  { id: 'post', name: 'Post', value: 'post' },
+  { id: 'pdf', name: 'PDF', value: 'pdf' },
+  { id: 'banner_flyer', name: 'Banner/Flyer', value: 'banner/flyer' },
+  { id: 'printable', name: 'Printable', value: 'printable' },
+  { id: 'logo_vector', name: 'Logo/Vector', value: 'logo/vector' },
+];
+
+const getPostTypeBadgeStyle = (type) => {
+  const t = (type || '').toLowerCase();
+  if (t === 'story') return 'bg-purple-50 text-purple-700 border border-purple-200';
+  if (t === 'reel') return 'bg-pink-50 text-pink-700 border border-pink-200';
+  if (t === 'post') return 'bg-sky-50 text-sky-700 border border-sky-200';
+  if (t === 'pdf') return 'bg-rose-50 text-rose-700 border border-rose-200';
+  if (t.includes('banner') || t.includes('flyer')) {
+    return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+  }
+  if (t === 'printable') return 'bg-amber-50 text-amber-700 border border-amber-200';
+  if (t.includes('logo') || t.includes('vector')) {
+    return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
+  }
+  return 'bg-slate-50 text-slate-700 border border-slate-200';
+};
+
 export default function WorkAllocation() {
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
   const [allocations, setAllocations] = useState([]);
+  const [postTypes, setPostTypes] = useState(DEFAULT_POST_TYPES);
   
   // Form states
   const [selectedEmpId, setSelectedEmpId] = useState('');
@@ -67,16 +94,30 @@ export default function WorkAllocation() {
       setAllocations(alls);
     });
 
+    // 4. Fetch Post Types
+    const qPost = query(collection(db, 'content_reports', 'data', 'post_types'), orderBy('name', 'asc'));
+    const unsubPost = onSnapshot(qPost, (snapshot) => {
+      if (!snapshot.empty) {
+        setPostTypes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } else {
+        setPostTypes(DEFAULT_POST_TYPES);
+      }
+    }, (error) => {
+      console.error("Error fetching post types:", error);
+      setPostTypes(DEFAULT_POST_TYPES);
+    });
+
     return () => {
       unsubEmp();
       unsubClient();
       unsubAlloc();
+      unsubPost();
     };
   }, []);
 
   // Handlers for dynamic tasks in Creation form
   const handleAddTask = () => {
-    setTasks([...tasks, { clientId: '', type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
+    setTasks([...tasks, { clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
   };
 
   const handleRemoveTask = (index) => {
@@ -109,7 +150,7 @@ export default function WorkAllocation() {
 
   // Handlers for dynamic tasks in Edit form
   const handleAddEditTask = () => {
-    setEditTasks([...editTasks, { clientId: '', type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
+    setEditTasks([...editTasks, { clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
   };
 
   const handleRemoveEditTask = (index) => {
@@ -228,7 +269,7 @@ export default function WorkAllocation() {
       });
 
       setSuccess('Work entry allocated successfully.');
-      setTasks([{ clientId: '', type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
+      setTasks([{ clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
       // Auto dismiss success after 3s
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -504,9 +545,9 @@ export default function WorkAllocation() {
                           onChange={(e) => handleUpdateTaskField(taskIdx, 'type', e.target.value)}
                           className="block w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 capitalize"
                         >
-                          <option value="story">Story</option>
-                          <option value="reel">Reel</option>
-                          <option value="post">Post</option>
+                          {postTypes.map(pt => (
+                            <option key={pt.id || pt.value} value={pt.value}>{pt.name}</option>
+                          ))}
                         </select>
                       </div>
 
@@ -676,11 +717,7 @@ export default function WorkAllocation() {
                         <td className="p-3.5">
                           <div className="flex flex-col gap-1">
                             {rowTasks.map((t, idx) => (
-                              <span key={idx} className={`inline-flex w-fit px-2 py-0.5 text-[10px] font-semibold rounded-full capitalize ${
-                                t.type === 'story' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                                t.type === 'reel' ? 'bg-pink-50 text-pink-700 border border-pink-200' :
-                                'bg-sky-50 text-sky-700 border border-sky-200'
-                              }`}>
+                              <span key={idx} className={`inline-flex w-fit px-2 py-0.5 text-[10px] font-semibold rounded-full capitalize ${getPostTypeBadgeStyle(t.type)}`}>
                                 {t.type}
                               </span>
                             ))}
@@ -894,9 +931,9 @@ export default function WorkAllocation() {
                           onChange={(e) => handleUpdateEditTaskField(taskIdx, 'type', e.target.value)}
                           className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 capitalize"
                         >
-                          <option value="story">Story</option>
-                          <option value="reel">Reel</option>
-                          <option value="post">Post</option>
+                          {postTypes.map(pt => (
+                            <option key={pt.id || pt.value} value={pt.value}>{pt.name}</option>
+                          ))}
                         </select>
                       </div>
 
