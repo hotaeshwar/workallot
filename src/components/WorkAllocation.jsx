@@ -35,6 +35,44 @@ const getPostTypeBadgeStyle = (type) => {
   return 'bg-slate-50 text-slate-700 border border-slate-200';
 };
 
+const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedBase64);
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
+
 export default function WorkAllocation() {
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
@@ -49,7 +87,7 @@ export default function WorkAllocation() {
 
   // Multiple tasks state in creation form
   const [tasks, setTasks] = useState([
-    { clientId: '', type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }
+    { clientId: '', type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated', image: '' }
   ]);
 
   // Table states
@@ -57,6 +95,7 @@ export default function WorkAllocation() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [viewImageSrc, setViewImageSrc] = useState(null);
 
   // Editing state
   const [editingAlloc, setEditingAlloc] = useState(null);
@@ -117,7 +156,7 @@ export default function WorkAllocation() {
 
   // Handlers for dynamic tasks in Creation form
   const handleAddTask = () => {
-    setTasks([...tasks, { clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
+    setTasks([...tasks, { clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated', image: '' }]);
   };
 
   const handleRemoveTask = (index) => {
@@ -150,7 +189,7 @@ export default function WorkAllocation() {
 
   // Handlers for dynamic tasks in Edit form
   const handleAddEditTask = () => {
-    setEditTasks([...editTasks, { clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
+    setEditTasks([...editTasks, { clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated', image: '' }]);
   };
 
   const handleRemoveEditTask = (index) => {
@@ -181,7 +220,7 @@ export default function WorkAllocation() {
     setEditTasks(updatedTasks);
   };
 
-  const shareRowOnWhatsApp = (alloc) => {
+  const shareRowOnWhatsApp = async (alloc) => {
     const rowTasks = alloc.tasks && alloc.tasks.length > 0 ? alloc.tasks : [{
       clientId: alloc.clientId || '',
       clientName: alloc.clientName || '',
@@ -189,10 +228,13 @@ export default function WorkAllocation() {
       urls: alloc.urls || (alloc.url ? [alloc.url] : []),
       driveUrl: alloc.driveUrl || '',
       remark: alloc.remark || '',
-      status: alloc.status || 'allocated'
+      status: alloc.status || 'allocated',
+      image: alloc.image || ''
     }];
 
     let message = '';
+    let firstImageToCopy = null;
+
     rowTasks.forEach((t, index) => {
       const resolvedStatus = t.status.charAt(0).toUpperCase() + t.status.slice(1);
       const refUrls = t.urls && t.urls.length > 0 ? t.urls.join(', ') : 'N/A';
@@ -213,8 +255,27 @@ export default function WorkAllocation() {
       if (t.remark) {
         message += `• *Remarks:* ${t.remark}\n`;
       }
+      if (t.image) {
+        message += `• *Image:* [Copied to clipboard - Paste (Ctrl+V) in chat]\n`;
+        if (!firstImageToCopy) {
+          firstImageToCopy = t.image;
+        }
+      }
       message += `-----------------------------------------\n\n`;
     });
+
+    if (firstImageToCopy) {
+      try {
+        const response = await fetch(firstImageToCopy);
+        const blob = await response.blob();
+        await navigator.clipboard.write([
+          new ClipboardItem({ [blob.type]: blob })
+        ]);
+        alert('Image has been copied to your clipboard! Paste it (Ctrl+V) in the WhatsApp window.');
+      } catch (err) {
+        console.error('Clipboard copy failed:', err);
+      }
+    }
 
     const encodedText = encodeURIComponent(message);
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
@@ -248,7 +309,8 @@ export default function WorkAllocation() {
         urls: t.urls.map(u => u.trim()).filter(u => u !== ''),
         driveUrl: t.driveUrl.trim(),
         remark: t.remark.trim(),
-        status: 'allocated'
+        status: 'allocated',
+        image: t.image || ''
       };
     });
 
@@ -269,7 +331,7 @@ export default function WorkAllocation() {
       });
 
       setSuccess('Work entry allocated successfully.');
-      setTasks([{ clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated' }]);
+      setTasks([{ clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated', image: '' }]);
       // Auto dismiss success after 3s
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -290,7 +352,8 @@ export default function WorkAllocation() {
       const tasksCopy = alloc.tasks.map(t => ({
         ...t,
         clientId: t.clientId || alloc.clientId || '',
-        clientName: t.clientName || alloc.clientName || ''
+        clientName: t.clientName || alloc.clientName || '',
+        image: t.image || ''
       }));
       setEditTasks(tasksCopy);
     } else {
@@ -302,7 +365,8 @@ export default function WorkAllocation() {
         urls: existingUrls.length > 0 ? existingUrls : [''],
         driveUrl: alloc.driveUrl || '',
         remark: alloc.remark || '',
-        status: alloc.status || 'allocated'
+        status: alloc.status || 'allocated',
+        image: alloc.image || ''
       }]);
     }
   };
@@ -328,7 +392,8 @@ export default function WorkAllocation() {
         urls: t.urls.map(u => u.trim()).filter(u => u !== ''),
         driveUrl: t.driveUrl.trim(),
         remark: t.remark.trim(),
-        status: t.status || 'allocated'
+        status: t.status || 'allocated',
+        image: t.image || ''
       };
     });
 
@@ -613,6 +678,44 @@ export default function WorkAllocation() {
                           className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
                         />
                       </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Task Image (Optional)
+                        </label>
+                        {task.image ? (
+                          <div className="flex items-center space-x-2 bg-white border border-slate-200 rounded-lg p-1.5">
+                            <img src={task.image} alt="Preview" className="h-10 w-10 object-cover rounded border border-slate-100 cursor-pointer" onClick={() => setViewImageSrc(task.image)} />
+                            <span className="text-[10px] text-slate-400 truncate flex-1">Image loaded</span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateTaskField(taskIdx, 'image', '')}
+                              className="p-1 hover:bg-red-50 text-red-500 rounded transition cursor-pointer"
+                              title="Remove Image"
+                            >
+                              <Trash className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                try {
+                                  const compressed = await compressImage(file);
+                                  handleUpdateTaskField(taskIdx, 'image', compressed);
+                                } catch (err) {
+                                  console.error('Image compression failed:', err);
+                                  alert('Failed to process image.');
+                                }
+                              }
+                            }}
+                            className="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                          />
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -743,6 +846,17 @@ export default function WorkAllocation() {
                                   </span>
                                 </div>
                                 <div className="flex flex-wrap gap-1.5 items-center">
+                                  {t.image && (
+                                    <div className="mr-1">
+                                      <img 
+                                        src={t.image} 
+                                        alt="Task" 
+                                        className="h-8 w-8 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition"
+                                        onClick={() => setViewImageSrc(t.image)}
+                                        title="Click to view image"
+                                      />
+                                    </div>
+                                  )}
                                   {t.driveUrl && (
                                     <a 
                                       href={t.driveUrl} 
@@ -998,6 +1112,44 @@ export default function WorkAllocation() {
                           className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
                         />
                       </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Task Image (Optional)
+                        </label>
+                        {task.image ? (
+                          <div className="flex items-center space-x-2 bg-white border border-slate-200 rounded-lg p-1.5">
+                            <img src={task.image} alt="Preview" className="h-10 w-10 object-cover rounded border border-slate-100 cursor-pointer" onClick={() => setViewImageSrc(task.image)} />
+                            <span className="text-[10px] text-slate-400 truncate flex-1">Image loaded</span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateEditTaskField(taskIdx, 'image', '')}
+                              className="p-1 hover:bg-red-50 text-red-500 rounded transition cursor-pointer"
+                              title="Remove Image"
+                            >
+                              <Trash className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                try {
+                                  const compressed = await compressImage(file);
+                                  handleUpdateEditTaskField(taskIdx, 'image', compressed);
+                                } catch (err) {
+                                  console.error('Image compression failed:', err);
+                                  alert('Failed to process image.');
+                                }
+                              }
+                            }}
+                            className="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                          />
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1020,6 +1172,50 @@ export default function WorkAllocation() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW IMAGE LIGHTBOX MODAL */}
+      {viewImageSrc && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setViewImageSrc(null)}>
+          <div className="bg-white border border-slate-250 rounded-2xl p-3 shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col relative" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setViewImageSrc(null)}
+              className="absolute top-2.5 right-2.5 p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-slate-700 transition cursor-pointer z-10"
+            >
+              <X className="h-4.5 w-4.5" />
+            </button>
+            <div className="overflow-auto flex items-center justify-center p-2 mt-6">
+              <img src={viewImageSrc} alt="Full view" className="max-w-full max-h-[70vh] object-contain rounded-lg" />
+            </div>
+            <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100 px-2">
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch(viewImageSrc);
+                    const blob = await response.blob();
+                    await navigator.clipboard.write([
+                      new ClipboardItem({ [blob.type]: blob })
+                    ]);
+                    alert('Image copied to clipboard! You can paste (Ctrl+V) it directly into WhatsApp.');
+                  } catch (err) {
+                    console.error('Clipboard copy failed:', err);
+                    alert('Failed to copy image to clipboard.');
+                  }
+                }}
+                className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-100 transition flex items-center space-x-1 cursor-pointer"
+              >
+                <span>Copy Image</span>
+              </button>
+              <a 
+                href={viewImageSrc} 
+                download="work_allocation_image.jpg"
+                className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg font-semibold hover:bg-emerald-100 transition flex items-center space-x-1 cursor-pointer"
+              >
+                <span>Download Image</span>
+              </a>
+            </div>
           </div>
         </div>
       )}

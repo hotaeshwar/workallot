@@ -4,7 +4,7 @@ import { collection, onSnapshot, query, getDocs, doc, updateDoc } from 'firebase
 import * as XLSX from 'xlsx';
 import { 
   FileSpreadsheet, Filter, Calendar, Users, Briefcase, 
-  Download, RefreshCw, Layers, ExternalLink, Share2
+  Download, RefreshCw, Layers, ExternalLink, Share2, X
 } from 'lucide-react';
 
 const getPostTypeBadgeStyle = (type) => {
@@ -42,6 +42,7 @@ export default function ReportExport() {
   const [filteredData, setFilteredData] = useState([]);
   const [flatTasks, setFlatTasks] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [viewImageSrc, setViewImageSrc] = useState(null);
 
   // Fetch all allocations (including archived ones so they can download history)
   useEffect(() => {
@@ -158,6 +159,7 @@ export default function ReportExport() {
             driveUrl: t.driveUrl || '',
             remark: t.remark || '',
             status: t.status || 'allocated',
+            image: t.image || '',
             isLegacy: false,
             parentAlloc: alloc
           });
@@ -188,6 +190,7 @@ export default function ReportExport() {
           driveUrl: alloc.driveUrl || '',
           remark: alloc.remark || '',
           status: alloc.status || 'allocated',
+          image: alloc.image || '',
           isLegacy: true,
           parentAlloc: alloc
         });
@@ -222,17 +225,21 @@ export default function ReportExport() {
       const dLink = taskItem.driveUrl || 'N/A';
       
       const statusText = taskItem.status.charAt(0).toUpperCase() + taskItem.status.slice(1);
+      const imgHtml = taskItem.image 
+        ? `<td style="border: 1px solid #dddddd; padding: 5px; text-align: center; vertical-align: middle;"><img src="${taskItem.image}" width="40" height="40" style="display:block; max-width:40px; max-height:40px; margin: 0 auto;" /></td>`
+        : `<td style="border: 1px solid #dddddd; padding: 10px 8px; color: #777777; font-style: italic; text-align: center; vertical-align: middle;">No Image</td>`;
       
       tableRows += `
-        <tr style="background-color: ${hex}; height: 28px;">
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; font-weight: 500; height: 28px; vertical-align: middle;">${taskItem.employeeName}</td>
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${taskItem.clientName}</td>
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; text-transform: capitalize; height: 28px; vertical-align: middle;">${taskItem.type}</td>
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${taskItem.date}</td>
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${refUrls}</td>
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${dLink}</td>
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${taskItem.remark || 'N/A'}</td>
-          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 28px; vertical-align: middle;">${statusText}</td>
+        <tr style="background-color: ${hex}; height: 48px;">
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; font-weight: 500; height: 48px; vertical-align: middle;">${taskItem.employeeName}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 48px; vertical-align: middle;">${taskItem.clientName}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; text-transform: capitalize; height: 48px; vertical-align: middle;">${taskItem.type}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 48px; vertical-align: middle;">${taskItem.date}</td>
+          ${imgHtml}
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 48px; vertical-align: middle;">${refUrls}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 48px; vertical-align: middle;">${dLink}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 48px; vertical-align: middle;">${taskItem.remark || 'N/A'}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 48px; vertical-align: middle;">${statusText}</td>
         </tr>
       `;
     });
@@ -268,17 +275,19 @@ export default function ReportExport() {
             <col width="160" />
             <col width="120" />
             <col width="130" />
+            <col width="100" />
             <col width="280" />
             <col width="280" />
             <col width="240" />
             <col width="130" />
-          </</colgroup>
+          </colgroup>
           <thead>
             <tr>
               <th>Employee Name</th>
               <th>Client Name</th>
               <th>Work Type</th>
               <th>Allocation Date</th>
+              <th>Image</th>
               <th>Reference URLs</th>
               <th>Google Drive Link</th>
               <th>Remarks</th>
@@ -314,6 +323,7 @@ export default function ReportExport() {
       'Client Name': taskItem.clientName,
       'Work Type': taskItem.type.toUpperCase(),
       'Allocation Date': taskItem.date,
+      'Image': taskItem.image ? 'Yes (Base64)' : 'No Image',
       'Reference URLs': taskItem.urls && taskItem.urls.length > 0 ? taskItem.urls.join(', ') : 'N/A',
       'Google Drive Link': taskItem.driveUrl || 'N/A',
       'Remarks': taskItem.remark || 'N/A',
@@ -365,13 +375,15 @@ export default function ReportExport() {
   };
 
   // Download logic 3: Share report directly to WhatsApp
-  const shareOnWhatsApp = () => {
+  const shareOnWhatsApp = async () => {
     if (flatTasks.length === 0) {
       alert('No data available to share.');
       return;
     }
 
     let message = '';
+    let firstImageToCopy = null;
+
     flatTasks.forEach((taskItem, index) => {
       const resolvedStatus = taskItem.status.charAt(0).toUpperCase() + taskItem.status.slice(1);
       const refUrls = taskItem.urls && taskItem.urls.length > 0 
@@ -394,15 +406,34 @@ export default function ReportExport() {
       if (taskItem.remark) {
         message += `• *Remarks:* ${taskItem.remark}\n`;
       }
+      if (taskItem.image) {
+        message += `• *Image:* [Copied to clipboard - Paste (Ctrl+V) in chat]\n`;
+        if (!firstImageToCopy) {
+          firstImageToCopy = taskItem.image;
+        }
+      }
       message += `-----------------------------------------\n\n`;
     });
+
+    if (firstImageToCopy) {
+      try {
+        const response = await fetch(firstImageToCopy);
+        const blob = await response.blob();
+        await navigator.clipboard.write([
+          new ClipboardItem({ [blob.type]: blob })
+        ]);
+        alert('Image has been copied to your clipboard! Paste it (Ctrl+V) in the WhatsApp window.');
+      } catch (err) {
+        console.error('Clipboard copy failed:', err);
+      }
+    }
 
     const encodedText = encodeURIComponent(message);
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
     window.open(whatsappUrl, '_blank');
   };
 
-  const shareTaskOnWhatsApp = (taskItem) => {
+  const shareTaskOnWhatsApp = async (taskItem) => {
     const resolvedStatus = taskItem.status.charAt(0).toUpperCase() + taskItem.status.slice(1);
     const refUrls = taskItem.urls && taskItem.urls.length > 0 ? taskItem.urls.join(', ') : 'N/A';
 
@@ -420,7 +451,23 @@ export default function ReportExport() {
     if (taskItem.remark) {
       message += `• *Remarks:* ${taskItem.remark}\n`;
     }
+    if (taskItem.image) {
+      message += `• *Image:* [Copied to clipboard - Paste (Ctrl+V) in chat]\n`;
+    }
     message += `-----------------------------------------\n\n`;
+
+    if (taskItem.image) {
+      try {
+        const response = await fetch(taskItem.image);
+        const blob = await response.blob();
+        await navigator.clipboard.write([
+          new ClipboardItem({ [blob.type]: blob })
+        ]);
+        alert('Image has been copied to your clipboard! Paste it (Ctrl+V) in the WhatsApp window.');
+      } catch (err) {
+        console.error('Clipboard copy failed:', err);
+      }
+    }
 
     const encodedText = encodeURIComponent(message);
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
@@ -672,6 +719,18 @@ export default function ReportExport() {
                         </td>
                         <td className="p-3 text-xs">
                           <div className="flex flex-col space-y-1">
+                            {/* Render Task Image Thumbnail */}
+                            {taskItem.image && (
+                              <div className="mb-1 w-fit">
+                                <img 
+                                  src={taskItem.image} 
+                                  alt="Task" 
+                                  className="h-8 w-8 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition"
+                                  onClick={() => setViewImageSrc(taskItem.image)}
+                                  title="Click to view image"
+                                />
+                              </div>
+                            )}
                             {/* Render Google Drive Link */}
                             {taskItem.driveUrl && (
                               <a 
@@ -770,6 +829,50 @@ export default function ReportExport() {
           </div>
         </div>
       </div>
+
+      {/* VIEW IMAGE LIGHTBOX MODAL */}
+      {viewImageSrc && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setViewImageSrc(null)}>
+          <div className="bg-white border border-slate-250 rounded-2xl p-3 shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col relative" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setViewImageSrc(null)}
+              className="absolute top-2.5 right-2.5 p-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-slate-700 transition cursor-pointer z-10"
+            >
+              <X className="h-4.5 w-4.5" />
+            </button>
+            <div className="overflow-auto flex items-center justify-center p-2 mt-6">
+              <img src={viewImageSrc} alt="Full view" className="max-w-full max-h-[70vh] object-contain rounded-lg" />
+            </div>
+            <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100 px-2">
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch(viewImageSrc);
+                    const blob = await response.blob();
+                    await navigator.clipboard.write([
+                      new ClipboardItem({ [blob.type]: blob })
+                    ]);
+                    alert('Image copied to clipboard! You can paste (Ctrl+V) it directly into WhatsApp.');
+                  } catch (err) {
+                    console.error('Clipboard copy failed:', err);
+                    alert('Failed to copy image to clipboard.');
+                  }
+                }}
+                className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-100 transition flex items-center space-x-1 cursor-pointer"
+              >
+                <span>Copy Image</span>
+              </button>
+              <a 
+                href={viewImageSrc} 
+                download="work_allocation_image.jpg"
+                className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg font-semibold hover:bg-emerald-100 transition flex items-center space-x-1 cursor-pointer"
+              >
+                <span>Download Image</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
