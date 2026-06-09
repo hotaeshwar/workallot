@@ -231,7 +231,7 @@ export default function ReportExport() {
       const statusText = taskItem.status.charAt(0).toUpperCase() + taskItem.status.slice(1);
       const imgHtml = taskItem.image 
         ? `<td style="border: 1px solid #dddddd; padding: 5px; text-align: center; vertical-align: middle;"><img src="${taskItem.image}" width="40" height="40" style="display:block; max-width:40px; max-height:40px; margin: 0 auto;" /></td>`
-        : `<td style="border: 1px solid #dddddd; padding: 10px 8px; color: #777777; font-style: italic; text-align: center; vertical-align: middle;">No Image</td>`;
+        : `<td style="border: 1px solid #dddddd; padding: 10px 8px; color: #777777; font-style: italic; text-align: center; vertical-align: middle;">No File</td>`;
       
       tableRows += `
         <tr style="background-color: ${hex}; height: 48px;">
@@ -295,7 +295,7 @@ export default function ReportExport() {
               <th>Client Name</th>
               <th>Work Type</th>
               <th>Allocation Date</th>
-              <th>Image</th>
+              <th>File Upload</th>
               <th>Reference URLs</th>
               <th>Google Drive Link</th>
               <th>MP3 Link</th>
@@ -333,7 +333,7 @@ export default function ReportExport() {
       'Client Name': taskItem.clientName,
       'Work Type': taskItem.type.toUpperCase(),
       'Allocation Date': taskItem.date,
-      'Image': taskItem.image ? 'Yes (Base64)' : 'No Image',
+      'File Upload': taskItem.image ? 'Yes (Base64)' : 'No File',
       'Reference URLs': taskItem.urls && taskItem.urls.length > 0 ? taskItem.urls.join(', ') : 'N/A',
       'Google Drive Link': taskItem.driveUrl || 'N/A',
       'MP3 Link': taskItem.mp3Url || 'N/A',
@@ -425,7 +425,7 @@ export default function ReportExport() {
         message += `• *Remarks:* ${taskItem.remark}\n`;
       }
       if (taskItem.image) {
-        message += `• *Image:* [Copied to clipboard - Paste (Ctrl+V) in chat]\n`;
+        message += `• *File:* [Copied to clipboard - Paste (Ctrl+V) in chat]\n`;
         if (!firstImageToCopy) {
           firstImageToCopy = taskItem.image;
         }
@@ -476,7 +476,7 @@ export default function ReportExport() {
       message += `• *Remarks:* ${taskItem.remark}\n`;
     }
     if (taskItem.image) {
-      message += `• *Image:* [Copied to clipboard - Paste (Ctrl+V) in chat]\n`;
+      message += `• *File:* [Copied to clipboard - Paste (Ctrl+V) in chat]\n`;
     }
     message += `-----------------------------------------\n\n`;
 

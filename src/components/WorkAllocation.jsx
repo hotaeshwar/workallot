@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { db } from '../firebase';
+import { db, storage } from '../firebase';
 import { 
   collection, addDoc, doc, updateDoc, deleteDoc, 
   onSnapshot, query, where, orderBy 
 } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { 
   PlusCircle, Edit3, Trash2, Archive, Search, ExternalLink, 
   CheckCircle, AlertCircle, X, Save, Plus, Trash, Share2,
-  Music, Video
+  Music, Video, UploadCloud, Loader2
 } from 'lucide-react';
 
 const DEFAULT_POST_TYPES = [
@@ -221,6 +222,167 @@ export default function WorkAllocation() {
     setEditTasks(updatedTasks);
   };
 
+  const handleFileUpload = (file, taskIdx, type, isEdit) => {
+    if (!file) return;
+
+    const progressField = `${type}Progress`;
+    const uploadingField = `${type}Uploading`;
+
+    if (isEdit) {
+      setEditTasks(prev => {
+        const updated = [...prev];
+        if (updated[taskIdx]) {
+          updated[taskIdx] = { 
+            ...updated[taskIdx], 
+            [uploadingField]: true, 
+            [progressField]: 0 
+          };
+        }
+        return updated;
+      });
+    } else {
+      setTasks(prev => {
+        const updated = [...prev];
+        if (updated[taskIdx]) {
+          updated[taskIdx] = { 
+            ...updated[taskIdx], 
+            [uploadingField]: true, 
+            [progressField]: 0 
+          };
+        }
+        return updated;
+      });
+    }
+
+    const storagePath = `allocations/tasks/${type}/${Date.now()}_${file.name}`;
+    const storageRef = ref(storage, storagePath);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+
+    uploadTask.on(
+      'state_changed',
+      (snapshot) => {
+        const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+        if (isEdit) {
+          setEditTasks(prev => {
+            const updated = [...prev];
+            if (updated[taskIdx]) {
+              updated[taskIdx] = { ...updated[taskIdx], [progressField]: progress };
+            }
+            return updated;
+          });
+        } else {
+          setTasks(prev => {
+            const updated = [...prev];
+            if (updated[taskIdx]) {
+              updated[taskIdx] = { ...updated[taskIdx], [progressField]: progress };
+            }
+            return updated;
+          });
+        }
+      },
+      (error) => {
+        console.error("Upload error:", error);
+        alert(`Failed to upload ${type.toUpperCase()} file.`);
+        if (isEdit) {
+          setEditTasks(prev => {
+            const updated = [...prev];
+            if (updated[taskIdx]) {
+              updated[taskIdx] = { 
+                ...updated[taskIdx], 
+                [uploadingField]: false, 
+                [progressField]: 0 
+              };
+            }
+            return updated;
+          });
+        } else {
+          setTasks(prev => {
+            const updated = [...prev];
+            if (updated[taskIdx]) {
+              updated[taskIdx] = { 
+                ...updated[taskIdx], 
+                [uploadingField]: false, 
+                [progressField]: 0 
+              };
+            }
+            return updated;
+          });
+        }
+      },
+      async () => {
+        try {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          const urlField = `${type}Url`;
+          
+          if (isEdit) {
+            setEditTasks(prev => {
+              const updated = [...prev];
+              if (updated[taskIdx]) {
+                updated[taskIdx] = { 
+                  ...updated[taskIdx], 
+                  [urlField]: downloadURL, 
+                  [uploadingField]: false, 
+                  [progressField]: 100 
+                };
+              }
+              return updated;
+            });
+          } else {
+            setTasks(prev => {
+              const updated = [...prev];
+              if (updated[taskIdx]) {
+                updated[taskIdx] = { 
+                  ...updated[taskIdx], 
+                  [urlField]: downloadURL, 
+                  [uploadingField]: false, 
+                  [progressField]: 100 
+                };
+              }
+              return updated;
+            });
+          }
+        } catch (err) {
+          console.error("Error getting download URL:", err);
+          alert("Failed to retrieve uploaded file URL.");
+        }
+      }
+    );
+  };
+
+  const handleRemoveUploadedFile = (taskIdx, type, isEdit) => {
+    const urlField = `${type}Url`;
+    const progressField = `${type}Progress`;
+    const uploadingField = `${type}Uploading`;
+
+    if (isEdit) {
+      setEditTasks(prev => {
+        const updated = [...prev];
+        if (updated[taskIdx]) {
+          updated[taskIdx] = { 
+            ...updated[taskIdx], 
+            [urlField]: '', 
+            [uploadingField]: false, 
+            [progressField]: 0 
+          };
+        }
+        return updated;
+      });
+    } else {
+      setTasks(prev => {
+        const updated = [...prev];
+        if (updated[taskIdx]) {
+          updated[taskIdx] = { 
+            ...updated[taskIdx], 
+            [urlField]: '', 
+            [uploadingField]: false, 
+            [progressField]: 0 
+          };
+        }
+        return updated;
+      });
+    }
+  };
+
   const shareRowOnWhatsApp = async (alloc) => {
     const rowTasks = alloc.tasks && alloc.tasks.length > 0 ? alloc.tasks : [{
       clientId: alloc.clientId || '',
@@ -263,7 +425,7 @@ export default function WorkAllocation() {
         message += `• *Remarks:* ${t.remark}\n`;
       }
       if (t.image) {
-        message += `• *Image:* [Copied to clipboard - Paste (Ctrl+V) in chat]\n`;
+        message += `• *File:* [Copied to clipboard - Paste (Ctrl+V) in chat]\n`;
         if (!firstImageToCopy) {
           firstImageToCopy = t.image;
         }
@@ -722,7 +884,7 @@ export default function WorkAllocation() {
 
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Task Image (Optional)
+                          File Upload (Optional)
                         </label>
                         {task.image ? (
                           <div className="flex items-center space-x-2 bg-white border border-slate-200 rounded-lg p-1.5">
@@ -1208,7 +1370,7 @@ export default function WorkAllocation() {
 
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Task Image (Optional)
+                          File Upload (Optional)
                         </label>
                         {task.image ? (
                           <div className="flex items-center space-x-2 bg-white border border-slate-200 rounded-lg p-1.5">
