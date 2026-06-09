@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { 
-  collection, addDoc, getDocs, doc, updateDoc, deleteDoc, 
+  collection, addDoc, doc, updateDoc, deleteDoc, 
   onSnapshot, query, where, orderBy 
 } from 'firebase/firestore';
 import { 
   PlusCircle, Edit3, Trash2, Archive, Search, ExternalLink, 
-  CheckCircle, AlertCircle, RefreshCw, X, Save, Plus, Trash, Share2 
+  CheckCircle, AlertCircle, X, Save, Plus, Trash, Share2,
+  Music, Video
 } from 'lucide-react';
 
 const DEFAULT_POST_TYPES = [
@@ -87,7 +88,7 @@ export default function WorkAllocation() {
 
   // Multiple tasks state in creation form
   const [tasks, setTasks] = useState([
-    { clientId: '', type: 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated', image: '' }
+    { clientId: '', type: 'story', urls: [''], driveUrl: '', mp3Url: '', mp4Url: '', remark: '', status: 'allocated', image: '' }
   ]);
 
   // Table states
@@ -156,7 +157,7 @@ export default function WorkAllocation() {
 
   // Handlers for dynamic tasks in Creation form
   const handleAddTask = () => {
-    setTasks([...tasks, { clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated', image: '' }]);
+    setTasks([...tasks, { clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', mp3Url: '', mp4Url: '', remark: '', status: 'allocated', image: '' }]);
   };
 
   const handleRemoveTask = (index) => {
@@ -189,7 +190,7 @@ export default function WorkAllocation() {
 
   // Handlers for dynamic tasks in Edit form
   const handleAddEditTask = () => {
-    setEditTasks([...editTasks, { clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', remark: '', status: 'allocated', image: '' }]);
+    setEditTasks([...editTasks, { clientId: '', type: postTypes[0]?.value || 'story', urls: [''], driveUrl: '', mp3Url: '', mp4Url: '', remark: '', status: 'allocated', image: '' }]);
   };
 
   const handleRemoveEditTask = (index) => {
@@ -248,6 +249,12 @@ export default function WorkAllocation() {
       message += `• *Status:* ${resolvedStatus}\n`;
       if (t.driveUrl) {
         message += `• *Google Drive Link:* ${t.driveUrl}\n`;
+      }
+      if (t.mp3Url) {
+        message += `• *MP3 Link:* ${t.mp3Url}\n`;
+      }
+      if (t.mp4Url) {
+        message += `• *MP4 Link:* ${t.mp4Url}\n`;
       }
       if (refUrls && refUrls !== 'N/A') {
         message += `• *Reference URLs:* ${refUrls}\n`;
@@ -308,6 +315,8 @@ export default function WorkAllocation() {
         type: t.type,
         urls: t.urls.map(u => u.trim()).filter(u => u !== ''),
         driveUrl: t.driveUrl.trim(),
+        mp3Url: (t.mp3Url || '').trim(),
+        mp4Url: (t.mp4Url || '').trim(),
         remark: t.remark.trim(),
         status: 'allocated',
         image: t.image || ''
@@ -353,7 +362,9 @@ export default function WorkAllocation() {
         ...t,
         clientId: t.clientId || alloc.clientId || '',
         clientName: t.clientName || alloc.clientName || '',
-        image: t.image || ''
+        image: t.image || '',
+        mp3Url: t.mp3Url || '',
+        mp4Url: t.mp4Url || ''
       }));
       setEditTasks(tasksCopy);
     } else {
@@ -364,6 +375,8 @@ export default function WorkAllocation() {
         type: alloc.type || 'story',
         urls: existingUrls.length > 0 ? existingUrls : [''],
         driveUrl: alloc.driveUrl || '',
+        mp3Url: alloc.mp3Url || '',
+        mp4Url: alloc.mp4Url || '',
         remark: alloc.remark || '',
         status: alloc.status || 'allocated',
         image: alloc.image || ''
@@ -391,6 +404,8 @@ export default function WorkAllocation() {
         type: t.type,
         urls: t.urls.map(u => u.trim()).filter(u => u !== ''),
         driveUrl: t.driveUrl.trim(),
+        mp3Url: (t.mp3Url || '').trim(),
+        mp4Url: (t.mp4Url || '').trim(),
         remark: t.remark.trim(),
         status: t.status || 'allocated',
         image: t.image || ''
@@ -668,6 +683,32 @@ export default function WorkAllocation() {
 
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          MP3 Link (Optional)
+                        </label>
+                        <input
+                          type="url"
+                          value={task.mp3Url || ''}
+                          onChange={(e) => handleUpdateTaskField(taskIdx, 'mp3Url', e.target.value)}
+                          placeholder="https://example.com/audio.mp3"
+                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          MP4 Link (Optional)
+                        </label>
+                        <input
+                          type="url"
+                          value={task.mp4Url || ''}
+                          onChange={(e) => handleUpdateTaskField(taskIdx, 'mp4Url', e.target.value)}
+                          placeholder="https://example.com/video.mp4"
+                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                           Remark / Instructions
                         </label>
                         <textarea
@@ -865,6 +906,32 @@ export default function WorkAllocation() {
                                       className="inline-flex items-center text-emerald-700 hover:text-emerald-800 hover:underline font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 text-[10px] mr-1"
                                     >
                                       <span>Drive Link</span>
+                                      <ExternalLink className="h-3 w-3 ml-1" />
+                                    </a>
+                                  )}
+
+                                  {t.mp3Url && (
+                                    <a 
+                                      href={t.mp3Url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center text-amber-700 hover:text-amber-800 hover:underline font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-[10px] mr-1"
+                                    >
+                                      <Music className="h-3 w-3 mr-1" />
+                                      <span>MP3 Link</span>
+                                      <ExternalLink className="h-3 w-3 ml-1" />
+                                    </a>
+                                  )}
+
+                                  {t.mp4Url && (
+                                    <a 
+                                      href={t.mp4Url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center text-rose-700 hover:text-rose-800 hover:underline font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 text-[10px] mr-1"
+                                    >
+                                      <Video className="h-3 w-3 mr-1" />
+                                      <span>MP4 Link</span>
                                       <ExternalLink className="h-3 w-3 ml-1" />
                                     </a>
                                   )}
@@ -1097,6 +1164,32 @@ export default function WorkAllocation() {
                           value={task.driveUrl}
                           onChange={(e) => handleUpdateEditTaskField(taskIdx, 'driveUrl', e.target.value)}
                           placeholder="https://drive.google.com/..."
+                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          MP3 Link (Optional)
+                        </label>
+                        <input
+                          type="url"
+                          value={task.mp3Url || ''}
+                          onChange={(e) => handleUpdateEditTaskField(taskIdx, 'mp3Url', e.target.value)}
+                          placeholder="https://example.com/audio.mp3"
+                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          MP4 Link (Optional)
+                        </label>
+                        <input
+                          type="url"
+                          value={task.mp4Url || ''}
+                          onChange={(e) => handleUpdateEditTaskField(taskIdx, 'mp4Url', e.target.value)}
+                          placeholder="https://example.com/video.mp4"
                           className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                         />
                       </div>

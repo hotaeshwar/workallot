@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { 
-  FileSpreadsheet, Filter, Calendar, Users, Briefcase, 
-  Download, RefreshCw, Layers, ExternalLink, Share2, X
+  FileSpreadsheet, Filter, 
+  Download, ExternalLink, Share2, X,
+  Music, Video
 } from 'lucide-react';
 
 const getPostTypeBadgeStyle = (type) => {
@@ -39,9 +40,6 @@ export default function ReportExport() {
     new Date().toLocaleDateString('en-CA')
   );
 
-  const [filteredData, setFilteredData] = useState([]);
-  const [flatTasks, setFlatTasks] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [viewImageSrc, setViewImageSrc] = useState(null);
 
   // Fetch all allocations (including archived ones so they can download history)
@@ -94,7 +92,7 @@ export default function ReportExport() {
   };
 
   // Re-run filtering whenever selectors change
-  useEffect(() => {
+  const filteredData = useMemo(() => {
     let result = [...allocations];
 
     // 1. Apply Entity Filters
@@ -125,11 +123,11 @@ export default function ReportExport() {
       result = result.filter(a => a.date >= start && a.date <= end);
     }
 
-    setFilteredData(result);
+    return result;
   }, [allocations, filterType, selectedClientId, selectedEmpId, dateRangeType, referenceDate]);
 
   // Map allocations down to individual tasks
-  useEffect(() => {
+  const flatTasks = useMemo(() => {
     const tasksList = [];
     filteredData.forEach(alloc => {
       if (alloc.tasks && alloc.tasks.length > 0) {
@@ -157,6 +155,8 @@ export default function ReportExport() {
             type: t.type,
             urls: t.urls || [],
             driveUrl: t.driveUrl || '',
+            mp3Url: t.mp3Url || '',
+            mp4Url: t.mp4Url || '',
             remark: t.remark || '',
             status: t.status || 'allocated',
             image: t.image || '',
@@ -188,6 +188,8 @@ export default function ReportExport() {
           type: alloc.type || 'story',
           urls: alloc.urls || (alloc.url ? [alloc.url] : []),
           driveUrl: alloc.driveUrl || '',
+          mp3Url: alloc.mp3Url || '',
+          mp4Url: alloc.mp4Url || '',
           remark: alloc.remark || '',
           status: alloc.status || 'allocated',
           image: alloc.image || '',
@@ -196,7 +198,7 @@ export default function ReportExport() {
         });
       }
     });
-    setFlatTasks(tasksList);
+    return tasksList;
   }, [filteredData, filterType, selectedClientId]);
 
   // Download logic 1: Excel using XML template that preserves CSS color styling (highly requested)
@@ -223,6 +225,8 @@ export default function ReportExport() {
       const hex = taskItem.employeeColor || '#ffffff';
       const refUrls = taskItem.urls && taskItem.urls.length > 0 ? taskItem.urls.join(', ') : 'N/A';
       const dLink = taskItem.driveUrl || 'N/A';
+      const mp3Lnk = taskItem.mp3Url || 'N/A';
+      const mp4Lnk = taskItem.mp4Url || 'N/A';
       
       const statusText = taskItem.status.charAt(0).toUpperCase() + taskItem.status.slice(1);
       const imgHtml = taskItem.image 
@@ -238,6 +242,8 @@ export default function ReportExport() {
           ${imgHtml}
           <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 48px; vertical-align: middle;">${refUrls}</td>
           <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 48px; vertical-align: middle;">${dLink}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 48px; vertical-align: middle;">${mp3Lnk}</td>
+          <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 48px; vertical-align: middle;">${mp4Lnk}</td>
           <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 48px; vertical-align: middle;">${taskItem.remark || 'N/A'}</td>
           <td style="border: 1px solid #dddddd; padding: 10px 8px; color: #000000; height: 48px; vertical-align: middle;">${statusText}</td>
         </tr>
@@ -279,6 +285,8 @@ export default function ReportExport() {
             <col width="280" />
             <col width="280" />
             <col width="240" />
+            <col width="240" />
+            <col width="240" />
             <col width="130" />
           </colgroup>
           <thead>
@@ -290,6 +298,8 @@ export default function ReportExport() {
               <th>Image</th>
               <th>Reference URLs</th>
               <th>Google Drive Link</th>
+              <th>MP3 Link</th>
+              <th>MP4 Link</th>
               <th>Remarks</th>
               <th>Status</th>
             </tr>
@@ -326,6 +336,8 @@ export default function ReportExport() {
       'Image': taskItem.image ? 'Yes (Base64)' : 'No Image',
       'Reference URLs': taskItem.urls && taskItem.urls.length > 0 ? taskItem.urls.join(', ') : 'N/A',
       'Google Drive Link': taskItem.driveUrl || 'N/A',
+      'MP3 Link': taskItem.mp3Url || 'N/A',
+      'MP4 Link': taskItem.mp4Url || 'N/A',
       'Remarks': taskItem.remark || 'N/A',
       'Status': taskItem.status.charAt(0).toUpperCase() + taskItem.status.slice(1),
       'Created At': taskItem.createdAt ? new Date(taskItem.createdAt).toLocaleString() : 'N/A'
@@ -400,6 +412,12 @@ export default function ReportExport() {
       if (taskItem.driveUrl) {
         message += `• *Google Drive Link:* ${taskItem.driveUrl}\n`;
       }
+      if (taskItem.mp3Url) {
+        message += `• *MP3 Link:* ${taskItem.mp3Url}\n`;
+      }
+      if (taskItem.mp4Url) {
+        message += `• *MP4 Link:* ${taskItem.mp4Url}\n`;
+      }
       if (refUrls && refUrls !== 'N/A') {
         message += `• *Reference URLs:* ${refUrls}\n`;
       }
@@ -444,6 +462,12 @@ export default function ReportExport() {
     message += `• *Status:* ${resolvedStatus}\n`;
     if (taskItem.driveUrl) {
       message += `• *Google Drive Link:* ${taskItem.driveUrl}\n`;
+    }
+    if (taskItem.mp3Url) {
+      message += `• *MP3 Link:* ${taskItem.mp3Url}\n`;
+    }
+    if (taskItem.mp4Url) {
+      message += `• *MP4 Link:* ${taskItem.mp4Url}\n`;
     }
     if (refUrls && refUrls !== 'N/A') {
       message += `• *Reference URLs:* ${refUrls}\n`;
@@ -628,6 +652,14 @@ export default function ReportExport() {
                 <FileSpreadsheet className="h-3.5 w-3.5" />
                 <span>Standard XLSX</span>
               </button>
+              <button
+                onClick={shareOnWhatsApp}
+                className="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 rounded-xl text-xs transition shadow-sm cursor-pointer"
+                title="Share this full report on WhatsApp"
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                <span>Share Report</span>
+              </button>
             </div>
           </div>
 
@@ -740,6 +772,32 @@ export default function ReportExport() {
                                 className="inline-flex items-center text-emerald-700 hover:text-emerald-800 hover:underline font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 w-fit"
                               >
                                 <span>Drive Link</span>
+                                <ExternalLink className="h-3 w-3 ml-1" />
+                              </a>
+                            )}
+                            {/* Render MP3 Link */}
+                            {taskItem.mp3Url && (
+                              <a 
+                                href={taskItem.mp3Url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-amber-700 hover:text-amber-800 hover:underline font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 w-fit"
+                              >
+                                <Music className="h-3 w-3 mr-1" />
+                                <span>MP3 Link</span>
+                                <ExternalLink className="h-3 w-3 ml-1" />
+                              </a>
+                            )}
+                            {/* Render MP4 Link */}
+                            {taskItem.mp4Url && (
+                              <a 
+                                href={taskItem.mp4Url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-rose-700 hover:text-rose-800 hover:underline font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 w-fit"
+                              >
+                                <Video className="h-3 w-3 mr-1" />
+                                <span>MP4 Link</span>
                                 <ExternalLink className="h-3 w-3 ml-1" />
                               </a>
                             )}

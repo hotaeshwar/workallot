@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import Login from './components/Login';
@@ -6,7 +6,6 @@ import Dashboard from './components/Dashboard';
 import ManageEntities from './components/ManageEntities';
 import WorkAllocation from './components/WorkAllocation';
 import ReportExport from './components/ReportExport';
-import { ShieldAlert } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState(null);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Clock, Calendar, LogOut, Users, FileSpreadsheet, PlusCircle, Menu, X, Briefcase } from 'lucide-react';
