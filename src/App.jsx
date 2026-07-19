@@ -115,12 +115,12 @@ export default function App() {
     );
   }
 
-  // 4. Default Login Screen (Admin & Employee selection)
+  // 4. Default Allocator Admin Login Screen
   return (
     <>
       <ToastContainer />
       <Login 
-        initialRole="employee"
+        initialRole="admin"
         onAdminLoginSuccess={(user) => setAdminUser(user)}
         onEmployeeLoginSuccess={(emp) => setEmployeeUser(emp)}
       />

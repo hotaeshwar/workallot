@@ -644,31 +644,31 @@ export default function ManageEntities() {
                   return (
                     <div
                       key={emp.id}
-                      className={`flex flex-col space-y-2 p-3.5 rounded-xl border ${theme.bg} ${theme.border} transition duration-150`}
+                      className={`flex flex-col space-y-3 p-3.5 rounded-xl border ${theme.bg} ${theme.border} transition duration-150 overflow-hidden w-full`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="flex items-center space-x-3 min-w-0">
                           {emp.photo ? (
-                            <img src={emp.photo} alt={emp.name} className="h-9 w-9 rounded-full object-cover border border-slate-200 shadow-xs" />
+                            <img src={emp.photo} alt={emp.name} className="h-9 w-9 rounded-full object-cover border border-slate-200 shadow-xs shrink-0" />
                           ) : (
-                            <div className="p-2 rounded-lg bg-white border border-slate-100 shadow-xs">
+                            <div className="p-2 rounded-lg bg-white border border-slate-100 shadow-xs shrink-0">
                               <User className={`h-4 w-4 ${theme.text}`} />
                             </div>
                           )}
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <span className="font-semibold text-sm text-slate-900 block leading-snug">{emp.name}</span>
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-1.5 flex-wrap">
+                              <span className="font-bold text-sm text-slate-900 leading-snug truncate">{emp.name}</span>
                               {emp.hasLogin && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-indigo-100 text-indigo-700 border border-indigo-200">
                                   Login Active
                                 </span>
                               )}
                             </div>
-                            <span className="text-xs text-slate-500">{emp.role} {emp.username ? `• @${emp.username}` : ''}</span>
+                            <span className="text-xs text-slate-500 block truncate">{emp.role} {emp.username ? `• @${emp.username}` : ''}</span>
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center space-x-1 shrink-0 self-end sm:self-auto">
                           <button
                             onClick={() => {
                               setEditEmp(emp);
@@ -710,7 +710,7 @@ export default function ManageEntities() {
                       </div>
 
                       {/* Base Salary & Resume Status Bar */}
-                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                      <div className="pt-2 border-t border-slate-200/60 flex flex-wrap items-center justify-between gap-2 text-xs">
                         <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                           Salary: ₹{emp.baseSalary ? Number(emp.baseSalary).toLocaleString('en-IN') : '0'}
                         </span>
@@ -718,20 +718,20 @@ export default function ManageEntities() {
                           <a
                             href={emp.resume}
                             download={emp.resumeName || `${emp.name}_Resume`}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold hover:bg-indigo-100 transition cursor-pointer text-xs shadow-2xs"
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold hover:bg-indigo-100 transition cursor-pointer text-xs shadow-2xs shrink-0"
                             title="Download Resume"
                           >
                             <Download className="h-3.5 w-3.5" />
                             <span>Download Resume</span>
                           </a>
                         ) : emp.resumeRequested ? (
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 shrink-0">
                             Requested
                           </span>
                         ) : (
                           <button
                             onClick={() => handleRequestResume(emp)}
-                            className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200 font-semibold transition cursor-pointer"
+                            className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200 font-semibold transition cursor-pointer text-xs shrink-0"
                           >
                             <Send className="h-3 w-3" />
                             <span>Request Resume</span>
