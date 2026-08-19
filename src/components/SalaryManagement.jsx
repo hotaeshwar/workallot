@@ -6,7 +6,7 @@ import {
   Building2, CheckCircle, Calculator, Download, X, Eye, Edit3, Save 
 } from 'lucide-react';
 
-export default function SalaryManagement() {
+export default function SalaryManagement({ isGuestMode = false }) {
   const [employees, setEmployees] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [leaveRecords, setLeaveRecords] = useState([]);
@@ -156,6 +156,7 @@ export default function SalaryManagement() {
 
   const handleGenerateSlip = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!empId || !baseSalary) {
       alert('Please select an employee and enter the base salary.');
       return;
@@ -203,6 +204,7 @@ export default function SalaryManagement() {
   };
 
   const handleOpenEditSlip = (slip) => {
+    if (isGuestMode) return;
     setEditingSlip(slip);
     setEditBaseSalary(String(slip.baseSalary || ''));
     setEditExpectedHours(String(slip.expectedHours || '160'));
@@ -214,6 +216,7 @@ export default function SalaryManagement() {
 
   const handleSaveEditSlip = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!editingSlip) return;
 
     try {
@@ -272,6 +275,7 @@ export default function SalaryManagement() {
   };
 
   const handleDeleteSlip = async (id, empName, month) => {
+    if (isGuestMode) return;
     if (window.confirm(`Delete salary slip for ${empName} (${month})?`)) {
       try {
         await deleteDoc(doc(db, 'content_reports', 'data', 'salary_slips', id));
@@ -318,13 +322,15 @@ export default function SalaryManagement() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowGenModal(true)}
-          className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md flex items-center space-x-2 cursor-pointer shrink-0"
-        >
-          <Plus className="h-4.5 w-4.5" />
-          <span>Generate New Salary Slip</span>
-        </button>
+        {!isGuestMode && (
+          <button
+            onClick={() => setShowGenModal(true)}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-md flex items-center space-x-2 cursor-pointer shrink-0"
+          >
+            <Plus className="h-4.5 w-4.5" />
+            <span>Generate New Salary Slip</span>
+          </button>
+        )}
       </div>
 
       {/* SALARY SLIPS TABLE */}
@@ -385,21 +391,25 @@ export default function SalaryManagement() {
                           <Eye className="h-3.5 w-3.5" />
                           <span>View PDF</span>
                         </button>
-                        <button
-                          onClick={() => handleOpenEditSlip(slip)}
-                          className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg transition cursor-pointer flex items-center space-x-1 font-bold text-xs"
-                          title="Edit Salary Slip Details"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSlip(slip.id, slip.employeeName, slip.monthLabel)}
-                          className="p-1.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-400 border border-slate-200 rounded-lg transition cursor-pointer"
-                          title="Delete Slip"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        {!isGuestMode && (
+                          <>
+                            <button
+                              onClick={() => handleOpenEditSlip(slip)}
+                              className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg transition cursor-pointer flex items-center space-x-1 font-bold text-xs"
+                              title="Edit Salary Slip Details"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSlip(slip.id, slip.employeeName, slip.monthLabel)}
+                              className="p-1.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-400 border border-slate-200 rounded-lg transition cursor-pointer"
+                              title="Delete Slip"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -74,10 +74,12 @@ const PALETTE = [
   { name: 'Orange', hex: '#FFEDD5', bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
 ];
 
-export default function ManageEntities() {
+export default function ManageEntities({ isGuestMode = false }) {
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
   const [postTypes, setPostTypes] = useState([]);
+  const [empIsGuest, setEmpIsGuest] = useState(false);
+  const [editIsGuest, setEditIsGuest] = useState(false);
 
   // Form states
   const [empName, setEmpName] = useState('');
@@ -196,6 +198,7 @@ export default function ManageEntities() {
 
   const handleAddEmployee = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!empName.trim() || !empRole.trim()) return;
     setLoadingEmp(true);
     setError('');
@@ -210,6 +213,7 @@ export default function ManageEntities() {
         color: empColor,
         photo: empPhoto || '',
         resumeRequested: false,
+        isGuest: empIsGuest,
         createdAt: new Date().toISOString(),
       });
       setEmpName('');
@@ -217,6 +221,7 @@ export default function ManageEntities() {
       setEmpRole('');
       setEmpBaseSalary('');
       setEmpPhoto('');
+      setEmpIsGuest(false);
       setEmpColor(PALETTE[Math.floor(Math.random() * PALETTE.length)].hex);
     } catch (err) {
       console.error(err);
@@ -228,6 +233,7 @@ export default function ManageEntities() {
 
   const handleUpdateEmployee = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!editEmp || !editName.trim() || !editRole.trim()) return;
 
     try {
@@ -238,6 +244,7 @@ export default function ManageEntities() {
         baseSalary: Number(editBaseSalary) || 0,
         color: editColor,
         photo: editPhoto || '',
+        isGuest: editIsGuest,
       });
       setEditEmp(null);
     } catch (err) {
@@ -247,6 +254,7 @@ export default function ManageEntities() {
   };
 
   const handleRequestResume = async (emp) => {
+    if (isGuestMode) return;
     try {
       await updateDoc(doc(db, 'content_reports', 'data', 'employees', emp.id), {
         resumeRequested: true,
@@ -260,6 +268,7 @@ export default function ManageEntities() {
 
   const handleAddClient = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!clientName.trim()) return;
     setLoadingClient(true);
     setError('');
@@ -282,6 +291,7 @@ export default function ManageEntities() {
 
   const handleAddPostType = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!postTypeName.trim()) return;
     setLoadingPostType(true);
     setError('');
@@ -305,6 +315,7 @@ export default function ManageEntities() {
   };
 
   const handleDeleteEmployee = async (id, name) => {
+    if (isGuestMode) return;
     if (window.confirm(`Are you sure you want to delete employee "${name}"?`)) {
       try {
         await deleteDoc(doc(db, 'content_reports', 'data', 'employees', id));
@@ -316,6 +327,7 @@ export default function ManageEntities() {
   };
 
   const handleDeleteClient = async (id, name) => {
+    if (isGuestMode) return;
     if (window.confirm(`Are you sure you want to delete client "${name}"?`)) {
       try {
         await deleteDoc(doc(db, 'content_reports', 'data', 'clients', id));
@@ -327,6 +339,7 @@ export default function ManageEntities() {
   };
 
   const handleDeletePostType = async (id, name) => {
+    if (isGuestMode) return;
     if (window.confirm(`Are you sure you want to delete post type "${name}"?`)) {
       try {
         await deleteDoc(doc(db, 'content_reports', 'data', 'post_types', id));
@@ -340,6 +353,7 @@ export default function ManageEntities() {
   // Save / Update login credentials for an employee
   const handleSaveCredentials = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!credModalEmp) return;
     if (!credUsername.trim() || !credPassword.trim()) {
       alert('Please enter both username/email and password.');
@@ -362,6 +376,7 @@ export default function ManageEntities() {
 
   // Delete login credentials for an employee
   const handleDeleteCredentials = async (emp) => {
+    if (isGuestMode) return;
     if (window.confirm(`Delete login credentials for "${emp.name}"? They will no longer be able to log in.`)) {
       try {
         await updateDoc(doc(db, 'content_reports', 'data', 'employees', emp.id), {
@@ -382,6 +397,7 @@ export default function ManageEntities() {
   // Handle Resolving Password Reset Request
   const handleResolvePasswordRequest = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!resetReqModal || !newResetPass.trim()) return;
 
     try {
@@ -473,13 +489,15 @@ export default function ManageEntities() {
                 <div className="pt-2 border-t border-slate-100 flex justify-end">
                   <button
                     onClick={() => {
+                      if (isGuestMode) return;
                       setResetReqModal(req);
                       setNewResetPass(Math.random().toString(36).slice(-6) + '123');
                     }}
-                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer shadow-xs"
+                    disabled={isGuestMode}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer shadow-xs disabled:opacity-55 disabled:cursor-not-allowed"
                   >
                     <KeyRound className="h-3.5 w-3.5" />
-                    <span>Reset Password & Share</span>
+                    <span>{isGuestMode ? 'View Only' : 'Reset Password & Share'}</span>
                   </button>
                 </div>
               </div>
@@ -518,10 +536,11 @@ export default function ManageEntities() {
               <input
                 type="text"
                 required
+                disabled={isGuestMode}
                 value={empName}
                 onChange={(e) => setEmpName(e.target.value)}
                 placeholder="E.g., Anjali Sharma"
-                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -531,10 +550,11 @@ export default function ManageEntities() {
               </label>
               <input
                 type="text"
+                disabled={isGuestMode}
                 value={empCode}
                 onChange={(e) => setEmpCode(e.target.value)}
                 placeholder="E.g., BID-101 (Auto-generated if empty)"
-                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-mono focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-mono focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -545,10 +565,11 @@ export default function ManageEntities() {
               <input
                 type="text"
                 required
+                disabled={isGuestMode}
                 value={empRole}
                 onChange={(e) => setEmpRole(e.target.value)}
                 placeholder="E.g., Social Media Specialist"
-                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -560,10 +581,11 @@ export default function ManageEntities() {
                 type="number"
                 min="0"
                 step="500"
+                disabled={isGuestMode}
                 value={empBaseSalary}
                 onChange={(e) => setEmpBaseSalary(e.target.value)}
                 placeholder="E.g., 25000 (Confidential to Allocator)"
-                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-semibold focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-semibold focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -582,8 +604,9 @@ export default function ManageEntities() {
                 <input
                   type="file"
                   accept="image/*"
+                  disabled={isGuestMode}
                   onChange={(e) => handlePhotoSelect(e, false)}
-                  className="block w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                  className="block w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -598,12 +621,13 @@ export default function ManageEntities() {
                   <button
                     key={color.name}
                     type="button"
+                    disabled={isGuestMode}
                     onClick={() => setEmpColor(color.hex)}
                     className={`h-9 w-full rounded-xl border transition-all ${
                       empColor === color.hex 
                         ? 'ring-2 ring-indigo-500 scale-105 border-indigo-600' 
                         : 'border-slate-200 hover:scale-105 shadow-xs'
-                    }`}
+                    } ${isGuestMode ? 'opacity-60 cursor-not-allowed' : ''}`}
                     style={{ backgroundColor: color.hex }}
                     title={color.name}
                   />
@@ -611,17 +635,32 @@ export default function ManageEntities() {
               </div>
             </div>
 
+            {/* Create as Guest Checkbox */}
+            <div className="flex items-center space-x-2 py-1">
+              <input
+                type="checkbox"
+                id="empIsGuest"
+                checked={empIsGuest}
+                disabled={isGuestMode}
+                onChange={(e) => setEmpIsGuest(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+              <label htmlFor="empIsGuest" className="text-xs font-bold text-slate-700 uppercase tracking-wider cursor-pointer select-none">
+                Create as Guest Account
+              </label>
+            </div>
+
             <button
               type="submit"
-              disabled={loadingEmp}
-              className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+              disabled={loadingEmp || isGuestMode}
+              className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loadingEmp ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
                 <>
                   <Plus className="h-4 w-4" />
-                  <span>Create Employee</span>
+                  <span>{empIsGuest ? 'Create Guest Account' : 'Create Employee'}</span>
                 </>
               )}
             </button>
@@ -658,6 +697,11 @@ export default function ManageEntities() {
                           <div className="min-w-0">
                             <div className="flex items-center space-x-1.5 flex-wrap">
                               <span className="font-bold text-sm text-slate-900 leading-snug truncate">{emp.name}</span>
+                              {emp.isGuest && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
+                                  Guest Account
+                                </span>
+                              )}
                               {emp.hasLogin && (
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-indigo-100 text-indigo-700 border border-indigo-200">
                                   Login Active
@@ -668,45 +712,48 @@ export default function ManageEntities() {
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-1 shrink-0 self-end sm:self-auto">
-                          <button
-                            onClick={() => {
-                              setEditEmp(emp);
-                              setEditName(emp.name);
-                              setEditCode(emp.code || `BID-${emp.id.substring(0, 4).toUpperCase()}`);
-                              setEditRole(emp.role);
-                              setEditBaseSalary(emp.baseSalary ? String(emp.baseSalary) : '');
-                              setEditColor(emp.color || PALETTE[0].hex);
-                              setEditPhoto(emp.photo || '');
-                            }}
-                            className="p-1.5 bg-white hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 text-slate-500 rounded-lg transition duration-150 shadow-xs cursor-pointer"
-                            title="Edit Employee"
-                          >
-                            <Edit3 className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setCredModalEmp(emp);
-                              setCredUsername(emp.username || '');
-                              setCredPassword(emp.password || '');
-                            }}
-                            className={`p-1.5 bg-white border rounded-lg transition duration-150 shadow-xs cursor-pointer ${
-                              emp.hasLogin 
-                                ? 'text-indigo-600 border-indigo-200 hover:bg-indigo-50' 
-                                : 'text-slate-400 border-slate-200 hover:bg-slate-50 hover:text-slate-700'
-                            }`}
-                            title={emp.hasLogin ? 'Edit Login Credentials' : 'Assign Login Credentials'}
-                          >
-                            <Key className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteEmployee(emp.id, emp.name)}
-                            className="p-1.5 bg-white hover:bg-red-50 hover:text-red-600 border border-slate-200 hover:border-red-200 text-slate-400 rounded-lg transition duration-150 shadow-xs cursor-pointer"
-                            title="Delete Employee"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                        {!isGuestMode && (
+                          <div className="flex items-center space-x-1 shrink-0 self-end sm:self-auto">
+                            <button
+                              onClick={() => {
+                                setEditEmp(emp);
+                                setEditName(emp.name);
+                                setEditCode(emp.code || `BID-${emp.id.substring(0, 4).toUpperCase()}`);
+                                setEditRole(emp.role);
+                                setEditBaseSalary(emp.baseSalary ? String(emp.baseSalary) : '');
+                                setEditColor(emp.color || PALETTE[0].hex);
+                                setEditPhoto(emp.photo || '');
+                                setEditIsGuest(emp.isGuest || false);
+                              }}
+                              className="p-1.5 bg-white hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 text-slate-500 rounded-lg transition duration-150 shadow-xs cursor-pointer"
+                              title="Edit Employee"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setCredModalEmp(emp);
+                                setCredUsername(emp.username || '');
+                                setCredPassword(emp.password || '');
+                              }}
+                              className={`p-1.5 bg-white border rounded-lg transition duration-150 shadow-xs cursor-pointer ${
+                                emp.hasLogin 
+                                  ? 'text-indigo-600 border-indigo-200 hover:bg-indigo-50' 
+                                  : 'text-slate-400 border-slate-200 hover:bg-slate-50 hover:text-slate-700'
+                              }`}
+                              title={emp.hasLogin ? 'Edit Login Credentials' : 'Assign Login Credentials'}
+                            >
+                              <Key className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEmployee(emp.id, emp.name)}
+                              className="p-1.5 bg-white hover:bg-red-50 hover:text-red-600 border border-slate-200 hover:border-red-200 text-slate-400 rounded-lg transition duration-150 shadow-xs cursor-pointer"
+                              title="Delete Employee"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Base Salary & Resume Status Bar */}
@@ -730,8 +777,12 @@ export default function ManageEntities() {
                           </span>
                         ) : (
                           <button
-                            onClick={() => handleRequestResume(emp)}
-                            className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200 font-semibold transition cursor-pointer text-xs shrink-0"
+                            onClick={() => {
+                              if (isGuestMode) return;
+                              handleRequestResume(emp);
+                            }}
+                            disabled={isGuestMode}
+                            className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200 font-semibold transition cursor-pointer text-xs shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
                           >
                             <Send className="h-3 w-3" />
                             <span>Request Resume</span>
@@ -766,10 +817,11 @@ export default function ManageEntities() {
               <input
                 type="text"
                 required
+                disabled={isGuestMode}
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
                 placeholder="E.g., Nike India"
-                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -779,17 +831,18 @@ export default function ManageEntities() {
               </label>
               <input
                 type="text"
+                disabled={isGuestMode}
                 value={clientIndustry}
                 onChange={(e) => setClientIndustry(e.target.value)}
                 placeholder="E.g., Apparel & Retail"
-                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
             <button
               type="submit"
-              disabled={loadingClient}
-              className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+              disabled={loadingClient || isGuestMode}
+              className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loadingClient ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -828,13 +881,15 @@ export default function ManageEntities() {
                         <span className="text-xs text-indigo-600 font-semibold">{cl.industry}</span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteClient(cl.id, cl.name)}
-                      className="p-2 bg-white hover:bg-red-50 hover:text-red-600 border border-slate-200 hover:border-red-200 text-slate-400 rounded-lg transition duration-150 shadow-xs"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {!isGuestMode && (
+                      <button
+                        onClick={() => handleDeleteClient(cl.id, cl.name)}
+                        className="p-2 bg-white hover:bg-red-50 hover:text-red-600 border border-slate-200 hover:border-red-200 text-slate-400 rounded-lg transition duration-150 shadow-xs cursor-pointer"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 ))
               )}
@@ -862,17 +917,18 @@ export default function ManageEntities() {
               <input
                 type="text"
                 required
+                disabled={isGuestMode}
                 value={postTypeName}
                 onChange={(e) => setPostTypeName(e.target.value)}
                 placeholder="E.g., PDF or Banner/Flyer"
-                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="block w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
 
             <button
               type="submit"
-              disabled={loadingPostType}
-              className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+              disabled={loadingPostType || isGuestMode}
+              className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loadingPostType ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -912,13 +968,15 @@ export default function ManageEntities() {
                           <span className="font-semibold text-sm text-slate-900 block leading-snug">{pt.name}</span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDeletePostType(pt.id, pt.name)}
-                        className="p-2 bg-white hover:bg-red-50 hover:text-red-600 border border-slate-200 hover:border-red-200 text-slate-400 rounded-lg transition duration-150 shadow-xs"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {!isGuestMode && (
+                        <button
+                          onClick={() => handleDeletePostType(pt.id, pt.name)}
+                          className="p-2 bg-white hover:bg-red-50 hover:text-red-600 border border-slate-200 hover:border-red-200 text-slate-400 rounded-lg transition duration-150 shadow-xs cursor-pointer"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   );
                 })
@@ -943,8 +1001,8 @@ export default function ManageEntities() {
                 <Key className="h-5 w-5 text-indigo-600" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Employee Credentials</h3>
-                <p className="text-xs text-slate-500">Assign login access for {credModalEmp.name}</p>
+                <h3 className="text-lg font-bold text-slate-900">{credModalEmp.isGuest ? 'Guest Login Credentials' : 'Employee Credentials'}</h3>
+                <p className="text-xs text-slate-500">{credModalEmp.isGuest ? `Assign login access for Guest: ${credModalEmp.name}` : `Assign login access for ${credModalEmp.name}`}</p>
               </div>
             </div>
 
@@ -1135,6 +1193,19 @@ export default function ManageEntities() {
                     />
                   ))}
                 </div>
+              </div>
+
+              <div className="flex items-center space-x-2 py-1">
+                <input
+                  type="checkbox"
+                  id="editIsGuest"
+                  checked={editIsGuest}
+                  onChange={(e) => setEditIsGuest(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <label htmlFor="editIsGuest" className="text-xs font-bold text-slate-700 uppercase tracking-wider cursor-pointer">
+                  Is Guest Account (Read-Only Console View)
+                </label>
               </div>
 
               <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100">

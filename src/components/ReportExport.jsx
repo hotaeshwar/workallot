@@ -24,7 +24,7 @@ const getPostTypeBadgeStyle = (type) => {
   return 'bg-slate-50 text-slate-700 border border-slate-200';
 };
 
-export default function ReportExport() {
+export default function ReportExport({ isGuestMode = false }) {
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
   const [allocations, setAllocations] = useState([]);
@@ -248,6 +248,7 @@ export default function ReportExport() {
   // Save Edit Task Changes
   const handleSaveEdit = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!editingTask) return;
 
     try {
@@ -605,6 +606,7 @@ export default function ReportExport() {
 
   // Delete a single entry/task
   const handleDeleteTask = async (taskItem) => {
+    if (isGuestMode) return;
     if (!window.confirm(`Are you sure you want to delete the entry for "${taskItem.clientName}" (${taskItem.employeeName})?`)) {
       return;
     }
@@ -630,6 +632,7 @@ export default function ReportExport() {
 
   // Delete all completed entries in current filtered view
   const handleDeleteCompleted = async () => {
+    if (isGuestMode) return;
     const completedTasks = flatTasks.filter(t => t.status === 'completed');
     if (completedTasks.length === 0) {
       alert('No completed entries found in the current view.');
@@ -837,14 +840,16 @@ export default function ReportExport() {
                 <Share2 className="h-3.5 w-3.5" />
                 <span>Share Report</span>
               </button>
-              <button
-                onClick={handleDeleteCompleted}
-                className="flex items-center space-x-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2 px-3 rounded-xl text-xs transition shadow-sm cursor-pointer"
-                title="Delete all completed entries in current view"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>Delete Completed</span>
-              </button>
+              {!isGuestMode && (
+                <button
+                  onClick={handleDeleteCompleted}
+                  className="flex items-center space-x-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2 px-3 rounded-xl text-xs transition shadow-sm cursor-pointer"
+                  title="Delete all completed entries in current view"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete Completed</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1056,6 +1061,7 @@ export default function ReportExport() {
                         <td className="p-3 text-center">
                           <select
                             value={taskItem.status}
+                            disabled={isGuestMode}
                             onChange={async (e) => {
                               try {
                                 const nextStatus = e.target.value;
@@ -1110,77 +1116,81 @@ export default function ReportExport() {
                               </span>
                             )}
 
-                            <div className="flex items-center space-x-1 pt-0.5">
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const parent = taskItem.parentAlloc;
-                                    if (taskItem.isLegacy) {
-                                      await updateDoc(doc(db, 'content_reports', 'data', 'allocations', taskItem.allocationId), {
-                                        approvalStatus: 'approved',
-                                        approvalRemark: ''
-                                      });
-                                    } else {
-                                      const updatedTasks = [...parent.tasks];
-                                      updatedTasks[taskItem.taskIndex].approvalStatus = 'approved';
-                                      updatedTasks[taskItem.taskIndex].approvalRemark = '';
-                                      await updateDoc(doc(db, 'content_reports', 'data', 'allocations', taskItem.allocationId), {
-                                        tasks: updatedTasks
-                                      });
-                                    }
-                                  } catch (err) {
-                                    console.error(err);
-                                    alert('Failed to approve task.');
-                                  }
-                                }}
-                                className="p-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded transition cursor-pointer"
-                                title="Approve Employee Submission"
-                              >
-                                <Check className="h-3 w-3" />
-                              </button>
-                              {taskItem.status !== 'completed' && taskItem.approvalStatus !== 'approved' && (
+                            {!isGuestMode && (
+                              <div className="flex items-center space-x-1 pt-0.5">
                                 <button
                                   onClick={async () => {
-                                    const remark = window.prompt('Enter disapproval reason for employee:');
-                                    if (remark === null) return;
                                     try {
                                       const parent = taskItem.parentAlloc;
                                       if (taskItem.isLegacy) {
                                         await updateDoc(doc(db, 'content_reports', 'data', 'allocations', taskItem.allocationId), {
-                                          approvalStatus: 'disapproved',
-                                          approvalRemark: remark.trim()
+                                          approvalStatus: 'approved',
+                                          approvalRemark: ''
                                         });
                                       } else {
                                         const updatedTasks = [...parent.tasks];
-                                        updatedTasks[taskItem.taskIndex].approvalStatus = 'disapproved';
-                                        updatedTasks[taskItem.taskIndex].approvalRemark = remark.trim();
+                                        updatedTasks[taskItem.taskIndex].approvalStatus = 'approved';
+                                        updatedTasks[taskItem.taskIndex].approvalRemark = '';
                                         await updateDoc(doc(db, 'content_reports', 'data', 'allocations', taskItem.allocationId), {
                                           tasks: updatedTasks
                                         });
                                       }
                                     } catch (err) {
                                       console.error(err);
-                                      alert('Failed to disapprove task.');
+                                      alert('Failed to approve task.');
                                     }
                                   }}
-                                  className="p-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded transition cursor-pointer"
-                                  title="Disapprove Employee Submission"
+                                  className="p-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded transition cursor-pointer"
+                                  title="Approve Employee Submission"
                                 >
-                                  <X className="h-3 w-3" />
+                                  <Check className="h-3 w-3" />
                                 </button>
-                              )}
-                            </div>
+                                {taskItem.status !== 'completed' && taskItem.approvalStatus !== 'approved' && (
+                                  <button
+                                    onClick={async () => {
+                                      const remark = window.prompt('Enter disapproval reason for employee:');
+                                      if (remark === null) return;
+                                      try {
+                                        const parent = taskItem.parentAlloc;
+                                        if (taskItem.isLegacy) {
+                                          await updateDoc(doc(db, 'content_reports', 'data', 'allocations', taskItem.allocationId), {
+                                            approvalStatus: 'disapproved',
+                                            approvalRemark: remark.trim()
+                                          });
+                                        } else {
+                                          const updatedTasks = [...parent.tasks];
+                                          updatedTasks[taskItem.taskIndex].approvalStatus = 'disapproved';
+                                          updatedTasks[taskItem.taskIndex].approvalRemark = remark.trim();
+                                          await updateDoc(doc(db, 'content_reports', 'data', 'allocations', taskItem.allocationId), {
+                                            tasks: updatedTasks
+                                          });
+                                        }
+                                      } catch (err) {
+                                        console.error(err);
+                                        alert('Failed to disapprove task.');
+                                      }
+                                    }}
+                                    className="p-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded transition cursor-pointer"
+                                    title="Disapprove Employee Submission"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex items-center justify-center space-x-1.5">
-                            <button
-                              onClick={() => handleOpenEdit(taskItem)}
-                              className="inline-flex items-center justify-center p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 rounded-lg transition duration-150 shadow-xs cursor-pointer"
-                              title="Edit Task Allocation"
-                            >
-                              <Edit3 className="h-3.5 w-3.5" />
-                            </button>
+                            {!isGuestMode && (
+                              <button
+                                onClick={() => handleOpenEdit(taskItem)}
+                                className="inline-flex items-center justify-center p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 rounded-lg transition duration-150 shadow-xs cursor-pointer"
+                                title="Edit Task Allocation"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
 
                             <button
                               onClick={() => shareTaskOnWhatsApp(taskItem)}
@@ -1191,7 +1201,7 @@ export default function ReportExport() {
                             </button>
                             
                             {/* Hide Delete Cross Button permanently if task is marked Completed (until Allocator edits it) */}
-                            {taskItem.status !== 'completed' && (
+                            {taskItem.status !== 'completed' && !isGuestMode && (
                               <button
                                 onClick={() => handleDeleteTask(taskItem)}
                                 className="inline-flex items-center justify-center p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg transition duration-150 shadow-xs cursor-pointer"

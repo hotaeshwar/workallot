@@ -24,15 +24,16 @@ const base64ToBlobUrl = (base64Data) => {
   }
 };
 
-export default function LeaveManagement() {
+export default function LeaveManagement({ isGuestMode = false }) {
   const [employees, setEmployees] = useState([]);
   const [leaves, setLeaves] = useState([]);
   const [selectedEmpId, setSelectedEmpId] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all'); // 'all', 'pending', 'approved', 'disapproved'
-  
-  // Feedback modal state
+  const [viewDocUrl, setViewDocUrl] = useState(null);
+
+  // Action Modals state
   const [actionLeave, setActionLeave] = useState(null);
-  const [actionType, setActionType] = useState('approved'); // 'approved' or 'disapproved'
+  const [actionType, setActionType] = useState(''); // 'approved' or 'disapproved'
   const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
@@ -42,20 +43,20 @@ export default function LeaveManagement() {
     });
 
     // Fetch Leaves
-    const unsubLeaves = onSnapshot(collection(db, 'content_reports', 'data', 'leaves'), (snapshot) => {
-      const levs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      levs.sort((a, b) => new Date(b.createdAt || b.startDate) - new Date(a.createdAt || a.startDate));
-      setLeaves(levs);
+    const unsubLeave = onSnapshot(collection(db, 'content_reports', 'data', 'leaves'), (snapshot) => {
+      const records = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      records.sort((a, b) => new Date(b.createdAt || b.startDate) - new Date(a.createdAt || a.startDate));
+      setLeaves(records);
     });
 
     return () => {
       unsubEmp();
-      unsubLeaves();
+      unsubLeave();
     };
   }, []);
 
   const filteredLeaves = useMemo(() => {
-    let result = [...leaves];
+    let result = leaves;
     if (selectedEmpId !== 'all') {
       result = result.filter(l => l.employeeId === selectedEmpId);
     }
@@ -66,6 +67,7 @@ export default function LeaveManagement() {
   }, [leaves, selectedEmpId, selectedStatus]);
 
   const handleOpenActionModal = (leave, type) => {
+    if (isGuestMode) return;
     setActionLeave(leave);
     setActionType(type);
     setFeedback(leave.allocatorFeedback || '');
@@ -73,6 +75,7 @@ export default function LeaveManagement() {
 
   const handleSaveAction = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!actionLeave) return;
 
     try {
@@ -90,6 +93,7 @@ export default function LeaveManagement() {
   };
 
   const handleRequestDoc = async (leave) => {
+    if (isGuestMode) return;
     try {
       await updateDoc(doc(db, 'content_reports', 'data', 'leaves', leave.id), {
         docRequested: true
@@ -102,6 +106,7 @@ export default function LeaveManagement() {
   };
 
   const handleDeleteLeave = async (id, empName) => {
+    if (isGuestMode) return;
     if (window.confirm(`Delete leave application for ${empName}?`)) {
       try {
         await deleteDoc(doc(db, 'content_reports', 'data', 'leaves', id));
@@ -221,14 +226,18 @@ export default function LeaveManagement() {
                             Requested
                           </span>
                         ) : (
-                          <button
-                            onClick={() => handleRequestDoc(l)}
-                            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200 font-semibold transition cursor-pointer text-xs"
-                            title="Request supporting document proof from employee"
-                          >
-                            <Send className="h-3 w-3" />
-                            <span>Request Doc</span>
-                          </button>
+                          !isGuestMode ? (
+                            <button
+                              onClick={() => handleRequestDoc(l)}
+                              className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200 font-semibold transition cursor-pointer text-xs"
+                              title="Request supporting document proof from employee"
+                            >
+                              <Send className="h-3 w-3" />
+                              <span>Request Doc</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 italic text-[10px]">None</span>
+                          )
                         )}
                       </td>
                       <td className="p-3 text-center">
@@ -255,27 +264,33 @@ export default function LeaveManagement() {
                       </td>
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center space-x-1.5">
-                          <button
-                            onClick={() => handleOpenActionModal(l, 'approved')}
-                            className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg transition cursor-pointer"
-                            title="Approve Leave"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenActionModal(l, 'disapproved')}
-                            className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg transition cursor-pointer"
-                            title="Disapprove Leave"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteLeave(l.id, l.employeeName)}
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-200 rounded-lg transition cursor-pointer"
-                            title="Delete Record"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {!isGuestMode ? (
+                            <>
+                              <button
+                                onClick={() => handleOpenActionModal(l, 'approved')}
+                                className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg transition cursor-pointer"
+                                title="Approve Leave"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleOpenActionModal(l, 'disapproved')}
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg transition cursor-pointer"
+                                title="Disapprove Leave"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteLeave(l.id, l.employeeName)}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-200 rounded-lg transition cursor-pointer"
+                                title="Delete Record"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-slate-400 italic text-xs">Read Only</span>
+                          )}
                         </div>
                       </td>
                     </tr>

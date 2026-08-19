@@ -26,6 +26,8 @@ export default function Login({ onAdminLoginSuccess, onEmployeeLoginSuccess, ini
     const portal = searchParams.get('portal') || searchParams.get('role');
     if (portal === 'allocator' || portal === 'admin') {
       setRoleMode('admin');
+    } else if (portal === 'guest' || window.location.pathname.includes('/guest')) {
+      setRoleMode('guest');
     } else if (portal === 'employee' || window.location.pathname.includes('/employee')) {
       setRoleMode('employee');
     }
@@ -82,11 +84,23 @@ export default function Login({ onAdminLoginSuccess, onEmployeeLoginSuccess, ini
         );
 
         if (foundEmp) {
+          if (roleMode === 'guest' && !foundEmp.isGuest) {
+            setError('This credential belongs to a standard employee. Please log in using the Employee Portal.');
+            showToast('Standard employee login not allowed here.', 'error');
+            setLoading(false);
+            return;
+          }
+          if (roleMode === 'employee' && foundEmp.isGuest) {
+            setError('This credential belongs to a Guest account. Please log in using the Guest Console URL.');
+            showToast('Guest login not allowed here.', 'error');
+            setLoading(false);
+            return;
+          }
           sessionStorage.setItem('workalloc_employee_session', JSON.stringify(foundEmp));
           showToast(`Welcome back, ${foundEmp.name}!`, 'success');
           onEmployeeLoginSuccess(foundEmp);
         } else {
-          setError('Invalid employee username or password. Please contact your Allocator or click "Forgot Password?".');
+          setError('Invalid username/email or password. Please contact your Allocator or click "Forgot Password?".');
           showToast('Invalid credentials. Please try again.', 'error');
         }
       }
@@ -124,7 +138,7 @@ export default function Login({ onAdminLoginSuccess, onEmployeeLoginSuccess, ini
             BUILDING INDIA DIGITAL
           </h2>
           <p className="mt-0.5 text-center text-xs font-bold text-indigo-600 uppercase tracking-wider">
-            {roleMode === 'employee' ? 'Employee Portal Login' : 'Allocator Console Login'}
+            {roleMode === 'guest' ? 'Guest Console Login' : roleMode === 'employee' ? 'Employee Portal Login' : 'Allocator Console Login'}
           </p>
         </div>
 
@@ -139,7 +153,7 @@ export default function Login({ onAdminLoginSuccess, onEmployeeLoginSuccess, ini
           <div className="space-y-4">
             <div>
               <label htmlFor="emailOrUsername" className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
-                {roleMode === 'admin' ? 'Admin Email Address' : 'Employee Username or Email'}
+                {roleMode === 'admin' ? 'Admin Email Address' : roleMode === 'guest' ? 'Guest Username or Email' : 'Employee Username or Email'}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -157,7 +171,7 @@ export default function Login({ onAdminLoginSuccess, onEmployeeLoginSuccess, ini
                   value={emailOrUsername}
                   onChange={(e) => setEmailOrUsername(e.target.value)}
                   className="block w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm"
-                  placeholder={roleMode === 'admin' ? 'admin@workallocate.com' : 'e.g. anjali or anjali@company.com'}
+                  placeholder={roleMode === 'admin' ? 'admin@workallocate.com' : roleMode === 'guest' ? 'e.g. guest_user' : 'e.g. anjali or anjali@company.com'}
                 />
               </div>
             </div>
@@ -216,7 +230,7 @@ export default function Login({ onAdminLoginSuccess, onEmployeeLoginSuccess, ini
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                roleMode === 'admin' ? 'Sign In as Allocator' : 'Sign In to Employee Portal'
+                roleMode === 'admin' ? 'Sign In as Allocator' : roleMode === 'guest' ? 'Sign In as Guest' : 'Sign In to Employee Portal'
               )}
             </button>
           </div>

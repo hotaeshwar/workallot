@@ -158,11 +158,28 @@ export default function EmployeeDashboard({ employee, onLogout }) {
     const unsubAtt = onSnapshot(collection(db, 'content_reports', 'data', 'attendance'), (snapshot) => {
       const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const empRecords = records.filter(r => r.employeeId === employee.id);
+      
+      // Auto-clockout check
+      const running = empRecords.find(r => r.status === 'clocked_in');
+      if (running && running.clockInIso) {
+        const start = new Date(running.clockInIso).getTime();
+        const now = new Date().getTime();
+        const limitMs = 8 * 60 * 60 * 1000;
+        if (now - start > limitMs) {
+          const autoClockOutDate = new Date(start + limitMs);
+          const timeStr = autoClockOutDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+          updateDoc(doc(db, 'content_reports', 'data', 'attendance', running.id), {
+            clockOutTime: timeStr,
+            clockOutIso: autoClockOutDate.toISOString(),
+            workDurationMinutes: 480, // 8 hours
+            status: 'completed',
+            autoClockedOut: true
+          }).catch(err => console.error("Auto clock-out error:", err));
+        }
+      }
+
       empRecords.sort((a, b) => new Date(b.clockInIso) - new Date(a.clockInIso));
       setAttendanceRecords(empRecords);
-
-      // Check if there is an active clocked-in session
-      const running = empRecords.find(r => r.status === 'clocked_in');
       setActiveSession(running || null);
     });
 
@@ -947,6 +964,10 @@ export default function EmployeeDashboard({ employee, onLogout }) {
                               {rec.status === 'clocked_in' ? (
                                 <span className="inline-flex px-2 py-0.5 text-[10px] font-extrabold rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
                                   Clocked In
+                                </span>
+                              ) : rec.autoClockedOut ? (
+                                <span className="inline-flex px-2 py-0.5 text-[10px] font-extrabold rounded bg-amber-100 text-amber-800 border border-amber-200" title="System Auto-Clocked Out after 8 Hours">
+                                  Auto Clocked Out
                                 </span>
                               ) : (
                                 <span className="inline-flex px-2 py-0.5 text-[10px] font-extrabold rounded bg-slate-100 text-slate-700 border border-slate-200">

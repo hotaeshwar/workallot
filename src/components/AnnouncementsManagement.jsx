@@ -3,7 +3,7 @@ import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Megaphone, Gift, FileText, Plus, Trash2, Send, Paperclip, UploadCloud } from 'lucide-react';
 
-export default function AnnouncementsManagement() {
+export default function AnnouncementsManagement({ isGuestMode = false }) {
   const [announcements, setAnnouncements] = useState([]);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -22,6 +22,7 @@ export default function AnnouncementsManagement() {
   }, []);
 
   const handleFileUpload = (e) => {
+    if (isGuestMode) return;
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -33,6 +34,7 @@ export default function AnnouncementsManagement() {
 
   const handleCreateAnnouncement = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!title.trim() || !message.trim()) return;
     setLoading(true);
 
@@ -59,6 +61,7 @@ export default function AnnouncementsManagement() {
   };
 
   const handleDeleteAnnouncement = async (id, titleStr) => {
+    if (isGuestMode) return;
     if (window.confirm(`Delete announcement "${titleStr}"?`)) {
       try {
         await deleteDoc(doc(db, 'content_reports', 'data', 'announcements', id));
@@ -95,99 +98,101 @@ export default function AnnouncementsManagement() {
           </div>
 
           <form onSubmit={handleCreateAnnouncement} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                Broadcast Type
-              </label>
-              <div className="grid grid-cols-3 gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setType('announcement')}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center cursor-pointer ${
-                    type === 'announcement' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Megaphone className="h-3.5 w-3.5 mb-0.5" />
-                  <span>Notice</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setType('birthday')}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center cursor-pointer ${
-                    type === 'birthday' ? 'bg-pink-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Gift className="h-3.5 w-3.5 mb-0.5" />
-                  <span>Birthday</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setType('document')}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center cursor-pointer ${
-                    type === 'document' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <FileText className="h-3.5 w-3.5 mb-0.5" />
-                  <span>Document</span>
-                </button>
+            <fieldset disabled={isGuestMode} className="space-y-4 border-0 p-0 m-0">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+                  Broadcast Type
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setType('announcement')}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center cursor-pointer ${
+                      type === 'announcement' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Megaphone className="h-3.5 w-3.5 mb-0.5" />
+                    <span>Notice</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setType('birthday')}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center cursor-pointer ${
+                      type === 'birthday' ? 'bg-pink-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Gift className="h-3.5 w-3.5 mb-0.5" />
+                    <span>Birthday</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setType('document')}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center cursor-pointer ${
+                      type === 'document' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <FileText className="h-3.5 w-3.5 mb-0.5" />
+                    <span>Document</span>
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
-                Title / Subject
-              </label>
-              <input
-                type="text"
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={
-                  type === 'birthday' ? 'e.g., Happy Birthday Anjali!' :
-                  type === 'document' ? 'e.g., Company Policy Handbook 2026' :
-                  'e.g., Important Team Meeting Tomorrow'
-                }
-                className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-              />
-            </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                  Title / Subject
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={
+                    type === 'birthday' ? 'e.g., Happy Birthday Anjali!' :
+                    type === 'document' ? 'e.g., Company Policy Handbook 2026' :
+                    'e.g., Important Team Meeting Tomorrow'
+                  }
+                  className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
+              </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
-                Message Content
-              </label>
-              <textarea
-                required
-                rows="4"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Write your announcement or birthday wish message here..."
-                className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-              />
-            </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                  Message Content
+                </label>
+                <textarea
+                  required
+                  rows="4"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Write your announcement or birthday wish message here..."
+                  className="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
+              </div>
 
-            {/* Optional Document Upload or File Link */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
-                Attach File or Document
-              </label>
-              <input
-                type="file"
-                onChange={handleFileUpload}
-                className="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
-              />
-              {fileUrl && (
-                <span className="text-[10px] text-emerald-600 font-bold block mt-1">✓ File attached successfully</span>
-              )}
-            </div>
+              {/* Optional Document Upload or File Link */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                  Attach File or Document
+                </label>
+                <input
+                  type="file"
+                  onChange={handleFileUpload}
+                  className="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                />
+                {fileUrl && (
+                  <span className="text-[10px] text-emerald-600 font-bold block mt-1">✓ File attached successfully</span>
+                )}
+              </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <Send className="h-4 w-4" />
-              <span>Publish Broadcast</span>
-            </button>
+              <button
+                type="submit"
+                disabled={loading || isGuestMode}
+                className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+                <span>{isGuestMode ? 'Publish (Read Only)' : 'Publish Broadcast'}</span>
+              </button>
+            </fieldset>
           </form>
         </div>
 
@@ -239,13 +244,15 @@ export default function AnnouncementsManagement() {
                       <h3 className="text-base font-extrabold text-slate-900">{ann.title}</h3>
                     </div>
 
-                    <button
-                      onClick={() => handleDeleteAnnouncement(ann.id, ann.title)}
-                      className="p-1.5 bg-white hover:bg-red-50 hover:text-red-600 border border-slate-200 text-slate-400 rounded-lg transition cursor-pointer shadow-xs"
-                      title="Delete Announcement"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {!isGuestMode && (
+                      <button
+                        onClick={() => handleDeleteAnnouncement(ann.id, ann.title)}
+                        className="p-1.5 bg-white hover:bg-red-50 hover:text-red-600 border border-slate-200 text-slate-400 rounded-lg transition cursor-pointer shadow-xs"
+                        title="Delete Announcement"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
 
                   <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{ann.message}</p>

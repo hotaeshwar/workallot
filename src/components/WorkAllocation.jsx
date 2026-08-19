@@ -75,7 +75,7 @@ const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => 
   });
 };
 
-export default function WorkAllocation() {
+export default function WorkAllocation({ isGuestMode = false }) {
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
   const [allocations, setAllocations] = useState([]);
@@ -223,6 +223,7 @@ export default function WorkAllocation() {
   };
 
   const handleFileUpload = (file, taskIdx, type, isEdit) => {
+    if (isGuestMode) return;
     if (!file) return;
 
     const progressField = `${type}Progress`;
@@ -350,6 +351,7 @@ export default function WorkAllocation() {
   };
 
   const handleRemoveUploadedFile = (taskIdx, type, isEdit) => {
+    if (isGuestMode) return;
     const urlField = `${type}Url`;
     const progressField = `${type}Progress`;
     const uploadingField = `${type}Uploading`;
@@ -453,6 +455,7 @@ export default function WorkAllocation() {
 
   const handleCreateAllocation = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!selectedEmpId) {
       setError('Please select an employee.');
       return;
@@ -514,6 +517,7 @@ export default function WorkAllocation() {
   };
 
   const handleOpenEdit = (alloc) => {
+    if (isGuestMode) return;
     setEditingAlloc(alloc);
     setEditEmpId(alloc.employeeId);
     setEditDate(alloc.date);
@@ -548,6 +552,7 @@ export default function WorkAllocation() {
 
   const handleUpdateAllocation = async (e) => {
     e.preventDefault();
+    if (isGuestMode) return;
     if (!editEmpId) return;
     const hasUnselectedClient = editTasks.some(t => !t.clientId);
     if (hasUnselectedClient) {
@@ -599,6 +604,7 @@ export default function WorkAllocation() {
   };
 
   const handleDeleteAllocation = async (id) => {
+    if (isGuestMode) return;
     if (window.confirm('Are you sure you want to permanently delete this allocation entry?')) {
       try {
         await deleteDoc(doc(db, 'content_reports', 'data', 'allocations', id));
@@ -612,6 +618,7 @@ export default function WorkAllocation() {
   };
 
   const handleArchiveAllocation = async (id) => {
+    if (isGuestMode) return;
     if (window.confirm('Archive this allocation? It will be removed from this active table but remains accessible in downloadable sheets.')) {
       try {
         await updateDoc(doc(db, 'content_reports', 'data', 'allocations', id), { archived: true });
@@ -699,245 +706,244 @@ export default function WorkAllocation() {
             </div>
           ) : (
             <form onSubmit={handleCreateAllocation} className="space-y-5">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                    Select Employee
-                  </label>
-                  <select
-                    required
-                    value={selectedEmpId}
-                    onChange={(e) => setSelectedEmpId(e.target.value)}
-                    className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  >
-                    <option value="">-- Choose Employee --</option>
-                    {employees.map(emp => (
-                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
-                    ))}
-                  </select>
+              <fieldset disabled={isGuestMode} className="space-y-5 border-0 p-0 m-0">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+                      Select Employee
+                    </label>
+                    <select
+                      required
+                      value={selectedEmpId}
+                      onChange={(e) => setSelectedEmpId(e.target.value)}
+                      className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    >
+                      <option value="">-- Choose Employee --</option>
+                      {employees.map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+                      Schedule Date
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={allocationDate}
+                      onChange={(e) => setAllocationDate(e.target.value)}
+                      className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                    Schedule Date
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={allocationDate}
-                    onChange={(e) => setAllocationDate(e.target.value)}
-                    className="block w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  />
-                </div>
-              </div>
+                {/* Tasks List */}
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tasks ({tasks.length})</span>
+                    {!isGuestMode && (
+                      <button
+                        type="button"
+                        onClick={handleAddTask}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Add Task</span>
+                      </button>
+                    )}
+                  </div>
 
-              {/* Tasks List */}
-              <div className="space-y-4 pt-4 border-t border-slate-100">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tasks ({tasks.length})</span>
-                  <button
-                    type="button"
-                    onClick={handleAddTask}
-                    className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-1 cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Add Task</span>
-                  </button>
-                </div>
-
-                <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
-                  {tasks.map((task, taskIdx) => (
-                    <div key={taskIdx} className="p-4 bg-slate-50/50 border border-slate-200/80 rounded-xl space-y-3 relative">
-                      {tasks.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTask(taskIdx)}
-                          className="absolute top-3 right-3 text-red-500 hover:text-red-705 p-1 rounded-lg hover:bg-red-50 transition cursor-pointer"
-                          title="Remove Task"
-                        >
-                          <Trash className="h-4 w-4" />
-                        </button>
-                      )}
-
-                      <span className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider">Task #{taskIdx + 1}</span>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Select Client
-                        </label>
-                        <select
-                          required
-                          value={task.clientId || ''}
-                          onChange={(e) => handleUpdateTaskField(taskIdx, 'clientId', e.target.value)}
-                          className="block w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                        >
-                          <option value="">-- Choose Client --</option>
-                          {clients.map(cl => (
-                            <option key={cl.id} value={cl.id}>{cl.name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Post Type
-                        </label>
-                        <select
-                          value={task.type}
-                          onChange={(e) => handleUpdateTaskField(taskIdx, 'type', e.target.value)}
-                          className="block w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 capitalize"
-                        >
-                          {postTypes.map(pt => (
-                            <option key={pt.id || pt.value} value={pt.value}>{pt.name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
-                          <span>Reference URLs (Optional)</span>
+                  <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+                    {tasks.map((task, taskIdx) => (
+                      <div key={taskIdx} className="p-4 bg-slate-50/50 border border-slate-200/80 rounded-xl space-y-3 relative">
+                        {tasks.length > 1 && !isGuestMode && (
                           <button
                             type="button"
-                            onClick={() => handleAddTaskUrl(taskIdx)}
-                            className="text-[10px] text-indigo-600 hover:text-indigo-850 font-bold flex items-center space-x-0.5 cursor-pointer"
+                            onClick={() => handleRemoveTask(taskIdx)}
+                            className="absolute top-3 right-3 text-red-500 hover:text-red-755 p-1 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                            title="Remove Task"
                           >
-                            <Plus className="h-3 w-3" />
-                            <span>Add URL</span>
+                            <Trash className="h-4 w-4" />
                           </button>
-                        </label>
-                        <div className="space-y-1.5">
-                          {task.urls.map((u, urlIdx) => (
-                            <div key={urlIdx} className="flex items-center space-x-1.5">
-                              <input
-                                type="url"
-                                value={u}
-                                onChange={(e) => handleUpdateTaskUrl(taskIdx, urlIdx, e.target.value)}
-                                placeholder="https://instagram.com/p/..."
-                                className="block flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                              />
-                              {task.urls.length > 1 && (
+                        )}
+
+                        <span className="block text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider">Task #{taskIdx + 1}</span>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Select Client
+                          </label>
+                          <select
+                            required
+                            value={task.clientId || ''}
+                            onChange={(e) => handleUpdateTaskField(taskIdx, 'clientId', e.target.value)}
+                            className="block w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          >
+                            <option value="">-- Choose Client --</option>
+                            {clients.map(cl => (
+                              <option key={cl.id} value={cl.id}>{cl.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Post Type
+                          </label>
+                          <select
+                            value={task.type}
+                            onChange={(e) => handleUpdateTaskField(taskIdx, 'type', e.target.value)}
+                            className="block w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 capitalize"
+                          >
+                            {postTypes.map(pt => (
+                              <option key={pt.id || pt.value} value={pt.value}>{pt.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Reference URLs (Paste & press Enter to add multiple)
+                          </label>
+                          <div className="space-y-1.5">
+                            {task.urls.map((url, urlIdx) => (
+                              <div key={urlIdx} className="flex items-center space-x-1">
+                                <input
+                                  type="url"
+                                  value={url}
+                                  onChange={(e) => handleUpdateTaskUrl(taskIdx, urlIdx, e.target.value)}
+                                  placeholder="https://instagram.com/..."
+                                  className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                />
+                                {task.urls.length > 1 && !isGuestMode && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveTaskUrl(taskIdx, urlIdx)}
+                                    className="p-1.5 bg-white hover:bg-red-50 text-slate-400 hover:text-red-500 border border-slate-200 hover:border-red-200 rounded-lg transition cursor-pointer"
+                                    title="Remove URL"
+                                  >
+                                    <Trash className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Google Drive Link (Optional)
+                          </label>
+                          <input
+                            type="url"
+                            value={task.driveUrl}
+                            onChange={(e) => handleUpdateTaskField(taskIdx, 'driveUrl', e.target.value)}
+                            placeholder="https://drive.google.com/..."
+                            className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            MP3 Link (Optional)
+                          </label>
+                          <input
+                            type="url"
+                            value={task.mp3Url || ''}
+                            onChange={(e) => handleUpdateTaskField(taskIdx, 'mp3Url', e.target.value)}
+                            placeholder="https://example.com/audio.mp3"
+                            className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            MP4 Link (Optional)
+                          </label>
+                          <input
+                            type="url"
+                            value={task.mp4Url || ''}
+                            onChange={(e) => handleUpdateTaskField(taskIdx, 'mp4Url', e.target.value)}
+                            placeholder="https://example.com/video.mp4"
+                            className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Remark / Instructions
+                          </label>
+                          <textarea
+                            value={task.remark}
+                            onChange={(e) => handleUpdateTaskField(taskIdx, 'remark', e.target.value)}
+                            placeholder="E.g., Publish at 6:00 PM with sports hashtags"
+                            rows="2"
+                            className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            File Upload (Optional)
+                          </label>
+                          {task.image ? (
+                            <div className="flex items-center space-x-2 bg-white border border-slate-200 rounded-lg p-1.5">
+                              <img src={task.image} alt="Preview" className="h-10 w-10 object-cover rounded border border-slate-100 cursor-pointer" onClick={() => setViewImageSrc(task.image)} />
+                              <span className="text-[10px] text-slate-400 truncate flex-1">Image loaded</span>
+                              {!isGuestMode && (
                                 <button
                                   type="button"
-                                  onClick={() => handleRemoveTaskUrl(taskIdx, urlIdx)}
-                                  className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-150 rounded-lg transition cursor-pointer"
-                                  title="Remove URL"
+                                  onClick={() => handleUpdateTaskField(taskIdx, 'image', '')}
+                                  className="p-1 hover:bg-red-50 text-red-500 rounded transition cursor-pointer"
+                                  title="Remove Image"
                                 >
                                   <Trash className="h-3.5 w-3.5" />
                                 </button>
                               )}
                             </div>
-                          ))}
+                          ) : (
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={isGuestMode}
+                              onChange={async (e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                  try {
+                                    const compressed = await compressImage(file);
+                                    handleUpdateTaskField(taskIdx, 'image', compressed);
+                                  } catch (err) {
+                                    console.error('Image compression failed:', err);
+                                    alert('Failed to process image.');
+                                  }
+                                }
+                              }}
+                              className="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                          )}
                         </div>
                       </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Google Drive Link (Optional)
-                        </label>
-                        <input
-                          type="url"
-                          value={task.driveUrl}
-                          onChange={(e) => handleUpdateTaskField(taskIdx, 'driveUrl', e.target.value)}
-                          placeholder="https://drive.google.com/..."
-                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          MP3 Link (Optional)
-                        </label>
-                        <input
-                          type="url"
-                          value={task.mp3Url || ''}
-                          onChange={(e) => handleUpdateTaskField(taskIdx, 'mp3Url', e.target.value)}
-                          placeholder="https://example.com/audio.mp3"
-                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          MP4 Link (Optional)
-                        </label>
-                        <input
-                          type="url"
-                          value={task.mp4Url || ''}
-                          onChange={(e) => handleUpdateTaskField(taskIdx, 'mp4Url', e.target.value)}
-                          placeholder="https://example.com/video.mp4"
-                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          Remark / Instructions
-                        </label>
-                        <textarea
-                          value={task.remark}
-                          onChange={(e) => handleUpdateTaskField(taskIdx, 'remark', e.target.value)}
-                          placeholder="E.g., Publish at 6:00 PM with sports hashtags"
-                          rows="2"
-                          className="block w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                          File Upload (Optional)
-                        </label>
-                        {task.image ? (
-                          <div className="flex items-center space-x-2 bg-white border border-slate-200 rounded-lg p-1.5">
-                            <img src={task.image} alt="Preview" className="h-10 w-10 object-cover rounded border border-slate-100 cursor-pointer" onClick={() => setViewImageSrc(task.image)} />
-                            <span className="text-[10px] text-slate-400 truncate flex-1">Image loaded</span>
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateTaskField(taskIdx, 'image', '')}
-                              className="p-1 hover:bg-red-50 text-red-500 rounded transition cursor-pointer"
-                              title="Remove Image"
-                            >
-                              <Trash className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={async (e) => {
-                              const file = e.target.files[0];
-                              if (file) {
-                                try {
-                                  const compressed = await compressImage(file);
-                                  handleUpdateTaskField(taskIdx, 'image', compressed);
-                                } catch (err) {
-                                  console.error('Image compression failed:', err);
-                                  alert('Failed to process image.');
-                                }
-                              }
-                            }}
-                            className="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center space-x-2 py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 transition"
-              >
-                {loading ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <>
-                    <PlusCircle className="h-4.5 w-4.5" />
-                    <span>Allocate Work ({tasks.length} {tasks.length === 1 ? 'Task' : 'Tasks'})</span>
-                  </>
-                )}
-              </button>
+                <button
+                  type="submit"
+                  disabled={loading || isGuestMode}
+                  className="w-full flex items-center justify-center space-x-2 py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 transition"
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <>
+                      <PlusCircle className="h-4.5 w-4.5" />
+                      <span>{isGuestMode ? 'Allocation (Read Only)' : `Allocate Work (${tasks.length} ${tasks.length === 1 ? 'Task' : 'Tasks'})`}</span>
+                    </>
+                  )}
+                </button>
+              </fieldset>
             </form>
           )}
         </div>
@@ -1143,30 +1149,34 @@ export default function WorkAllocation() {
                             >
                               <Share2 className="h-3.5 w-3.5" />
                             </button>
-                            <button
-                              onClick={() => handleOpenEdit(alloc)}
-                              className="p-1.5 bg-white hover:bg-slate-50 text-indigo-600 border border-slate-200 rounded-lg transition shadow-xs cursor-pointer"
-                              title="Edit Entry"
-                            >
-                              <Edit3 className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleArchiveAllocation(alloc.id)}
-                              className="p-1.5 bg-white hover:bg-slate-50 text-amber-600 border border-slate-200 rounded-lg transition shadow-xs cursor-pointer"
-                              title="Archive Entry"
-                            >
-                              <Archive className="h-3.5 w-3.5" />
-                            </button>
-                             {/* Hide Delete Cross Button permanently if allocation is marked Completed (until Allocator edits it) */}
-                             {alloc.status !== 'completed' && (
-                               <button
-                                 onClick={() => handleDeleteAllocation(alloc.id)}
-                                 className="p-1.5 bg-white hover:bg-red-50 text-slate-400 hover:text-red-600 border border-slate-200 hover:border-red-200 rounded-lg transition shadow-xs cursor-pointer"
-                                 title="Delete Permanently"
-                               >
-                                 <Trash2 className="h-3.5 w-3.5" />
-                               </button>
-                             )}
+                            {!isGuestMode && (
+                              <>
+                                <button
+                                  onClick={() => handleOpenEdit(alloc)}
+                                  className="p-1.5 bg-white hover:bg-slate-50 text-indigo-600 border border-slate-200 rounded-lg transition shadow-xs cursor-pointer"
+                                  title="Edit Entry"
+                                >
+                                  <Edit3 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleArchiveAllocation(alloc.id)}
+                                  className="p-1.5 bg-white hover:bg-slate-50 text-amber-600 border border-slate-200 rounded-lg transition shadow-xs cursor-pointer"
+                                  title="Archive Entry"
+                                >
+                                  <Archive className="h-3.5 w-3.5" />
+                                </button>
+                                {/* Hide Delete Cross Button permanently if allocation is marked Completed (until Allocator edits it) */}
+                                {alloc.status !== 'completed' && (
+                                  <button
+                                    onClick={() => handleDeleteAllocation(alloc.id)}
+                                    className="p-1.5 bg-white hover:bg-red-50 text-slate-400 hover:text-red-600 border border-slate-200 hover:border-red-200 rounded-lg transition shadow-xs cursor-pointer"
+                                    title="Delete Permanently"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>

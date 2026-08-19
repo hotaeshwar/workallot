@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { Clock, Filter, Download, Trash2, Calendar, User, FileSpreadsheet } from 'lucide-react';
 
-export default function AttendanceManagement() {
+export default function AttendanceManagement({ isGuestMode = false }) {
   const [employees, setEmployees] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [selectedEmpId, setSelectedEmpId] = useState('all');
@@ -19,6 +19,26 @@ export default function AttendanceManagement() {
     // Fetch Attendance
     const unsubAtt = onSnapshot(collection(db, 'content_reports', 'data', 'attendance'), (snapshot) => {
       const records = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const nowMs = new Date().getTime();
+      const limitMs = 8 * 60 * 60 * 1000;
+
+      records.forEach(rec => {
+        if (rec.status === 'clocked_in' && rec.clockInIso) {
+          const startMs = new Date(rec.clockInIso).getTime();
+          if (nowMs - startMs > limitMs) {
+            const autoClockOutDate = new Date(startMs + limitMs);
+            const timeStr = autoClockOutDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            updateDoc(doc(db, 'content_reports', 'data', 'attendance', rec.id), {
+              clockOutTime: timeStr,
+              clockOutIso: autoClockOutDate.toISOString(),
+              workDurationMinutes: 480, // 8 hours
+              status: 'completed',
+              autoClockedOut: true
+            }).catch(err => console.error("Auto clock-out error:", err));
+          }
+        }
+      });
+
       records.sort((a, b) => new Date(b.clockInIso || b.date) - new Date(a.clockInIso || a.date));
       setAttendanceRecords(records);
     });
@@ -197,6 +217,7 @@ export default function AttendanceManagement() {
   };
 
   const handleDeleteRecord = async (id, name, date) => {
+    if (isGuestMode) return;
     if (window.confirm(`Delete attendance record for ${name} on ${date}?`)) {
       try {
         await deleteDoc(doc(db, 'content_reports', 'data', 'attendance', id));
@@ -359,6 +380,10 @@ export default function AttendanceManagement() {
                             <span className="inline-flex px-2 py-0.5 text-[10px] font-extrabold rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
                               Clocked In
                             </span>
+                          ) : rec.autoClockedOut ? (
+                            <span className="inline-flex px-2 py-0.5 text-[10px] font-extrabold rounded bg-amber-100 text-amber-800 border border-amber-200" title="System Auto-Clocked Out after 8 Hours">
+                              Auto Clocked Out
+                            </span>
                           ) : (
                             <span className="inline-flex px-2 py-0.5 text-[10px] font-extrabold rounded bg-slate-100 text-slate-700 border border-slate-200">
                               Completed
@@ -366,13 +391,17 @@ export default function AttendanceManagement() {
                           )}
                         </td>
                         <td className="p-3 text-center">
-                          <button
-                            onClick={() => handleDeleteRecord(rec.id, rec.employeeName, rec.date)}
-                            className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg transition cursor-pointer"
-                            title="Delete attendance record"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {!isGuestMode ? (
+                            <button
+                              onClick={() => handleDeleteRecord(rec.id, rec.employeeName, rec.date)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg transition cursor-pointer"
+                              title="Delete attendance record"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 italic text-xs">Read Only</span>
+                          )}
                         </td>
                       </tr>
                     );

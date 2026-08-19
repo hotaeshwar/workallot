@@ -55,10 +55,11 @@ export default function App() {
     setEmployeeUser(null);
   };
 
-  // Detect if current URL is specifically requesting Employee portal
+  // Detect if current URL is specifically requesting Employee or Guest portals
   const searchParams = new URLSearchParams(window.location.search);
   const portalParam = searchParams.get('portal') || searchParams.get('role');
   const isEmployeeURL = window.location.pathname.includes('/employee') || portalParam === 'employee';
+  const isGuestURL = window.location.pathname.includes('/guest') || portalParam === 'guest';
 
   if (showSplash || loading) {
     return (
@@ -71,6 +72,29 @@ export default function App() {
 
   // 1. Employee Session Active
   if (employeeUser) {
+    if (employeeUser.isGuest) {
+      return (
+        <>
+          <ToastContainer />
+          <Dashboard 
+            user={{ displayName: employeeUser.name, email: employeeUser.username ? `${employeeUser.username}@guest.local` : 'guest@company.com' }} 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab}
+            isGuestMode={true}
+            onLogout={handleEmployeeLogout}
+          >
+            {activeTab === 'manage' && <ManageEntities isGuestMode={true} />}
+            {activeTab === 'allocation' && <WorkAllocation isGuestMode={true} />}
+            {activeTab === 'reports' && <ReportExport isGuestMode={true} />}
+            {activeTab === 'attendance' && <AttendanceManagement isGuestMode={true} />}
+            {activeTab === 'leaves' && <LeaveManagement isGuestMode={true} />}
+            {activeTab === 'salary' && <SalaryManagement isGuestMode={true} />}
+            {activeTab === 'announcements' && <AnnouncementsManagement isGuestMode={true} />}
+          </Dashboard>
+        </>
+      );
+    }
+
     return (
       <>
         <ToastContainer />
@@ -89,6 +113,21 @@ export default function App() {
         <ToastContainer />
         <Login 
           initialRole="employee"
+          isEmployeeOnly={true}
+          onAdminLoginSuccess={(user) => setAdminUser(user)}
+          onEmployeeLoginSuccess={(emp) => setEmployeeUser(emp)}
+        />
+      </>
+    );
+  }
+
+  // 2.5. Specific Guest URL requested -> Show Guest Login Screen
+  if (isGuestURL) {
+    return (
+      <>
+        <ToastContainer />
+        <Login 
+          initialRole="guest"
           isEmployeeOnly={true}
           onAdminLoginSuccess={(user) => setAdminUser(user)}
           onEmployeeLoginSuccess={(emp) => setEmployeeUser(emp)}

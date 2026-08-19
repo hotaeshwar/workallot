@@ -3,7 +3,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Clock, Calendar, LogOut, Users, FileSpreadsheet, PlusCircle, Menu, X, Briefcase, Megaphone, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
 
-export default function Dashboard({ user, activeTab, setActiveTab, children }) {
+export default function Dashboard({ user, activeTab, setActiveTab, isGuestMode = false, onLogout, children }) {
   const [istTime, setIstTime] = useState('');
   const [istDate, setIstDate] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -41,6 +41,10 @@ export default function Dashboard({ user, activeTab, setActiveTab, children }) {
   }, []);
 
   const handleLogout = async () => {
+    if (onLogout) {
+      onLogout();
+      return;
+    }
     try {
       await signOut(auth);
     } catch (err) {
@@ -70,7 +74,7 @@ export default function Dashboard({ user, activeTab, setActiveTab, children }) {
             <div className="w-px h-8 bg-slate-200 hidden sm:block"></div>
             <div>
               <span className="text-lg font-black tracking-tight text-slate-900 block leading-tight">BUILDING INDIA DIGITAL</span>
-              <span className="text-xs text-indigo-600 font-bold uppercase tracking-wider">Allocator Admin Console</span>
+              <span className="text-xs text-indigo-600 font-bold uppercase tracking-wider">{isGuestMode ? 'Guest Console' : 'Allocator Admin Console'}</span>
             </div>
           </div>
 
@@ -91,7 +95,7 @@ export default function Dashboard({ user, activeTab, setActiveTab, children }) {
           <div className="flex items-center space-x-4">
             <div className="hidden sm:block text-right">
               <div className="text-sm font-semibold text-slate-800 capitalize">{adminName}</div>
-              <div className="text-xs text-slate-500 font-medium">Role: Admin</div>
+              <div className="text-xs text-slate-500 font-medium">Role: {isGuestMode ? 'Guest (Read Only)' : 'Admin'}</div>
             </div>
             <button
               onClick={handleLogout}
