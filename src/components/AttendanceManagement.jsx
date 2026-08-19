@@ -4,6 +4,54 @@ import { collection, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc } fro
 import * as XLSX from 'xlsx';
 import { Clock, Filter, Download, Trash2, Calendar, User, FileSpreadsheet } from 'lucide-react';
 
+// Helper to check if a clock-in time is after 10:30 AM IST
+const checkLateClockIn = (isoString) => {
+  if (!isoString) return false;
+  try {
+    const date = new Date(isoString);
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    }).formatToParts(date);
+    let hour = 0;
+    let minute = 0;
+    for (const part of parts) {
+      if (part.type === 'hour') hour = parseInt(part.value, 10);
+      if (part.type === 'minute') minute = parseInt(part.value, 10);
+    }
+    return hour > 10 || (hour === 10 && minute > 30);
+  } catch (err) {
+    console.error('Error checking late clock-in:', err);
+    return false;
+  }
+};
+
+// Helper to get 6:30 PM IST Date object for a given date
+const get630PmDate = (isoString) => {
+  try {
+    const date = new Date(isoString);
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date);
+    let year, month, day;
+    for (const p of parts) {
+      if (p.type === 'year') year = p.value;
+      if (p.type === 'month') month = p.value;
+      if (p.type === 'day') day = p.value;
+    }
+    // 13:00 UTC is exactly 18:30 IST (+05:30)
+    return new Date(Date.UTC(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10), 13, 0, 0));
+  } catch (err) {
+    console.error('Error constructing 6:30 PM date:', err);
+    return new Date(new Date(isoString).getTime() + 8 * 60 * 60 * 1000);
+  }
+};
+
 export default function AttendanceManagement({ isGuestMode = false }) {
   const [employees, setEmployees] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
@@ -25,16 +73,48 @@ export default function AttendanceManagement({ isGuestMode = false }) {
       records.forEach(rec => {
         if (rec.status === 'clocked_in' && rec.clockInIso) {
           const startMs = new Date(rec.clockInIso).getTime();
-          if (nowMs - startMs > limitMs) {
-            const autoClockOutDate = new Date(startMs + limitMs);
-            const timeStr = autoClockOutDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-            updateDoc(doc(db, 'content_reports', 'data', 'attendance', rec.id), {
-              clockOutTime: timeStr,
-              clockOutIso: autoClockOutDate.toISOString(),
-              workDurationMinutes: 480, // 8 hours
-              status: 'completed',
-              autoClockedOut: true
-            }).catch(err => console.error("Auto clock-out error:", err));
+          const isLate = rec.isLateClockIn || checkLateClockIn(rec.clockInIso);
+          
+          if (isLate) {
+            const autoClockOutDate = get630PmDate(rec.clockInIso);
+            if (startMs < autoClockOutDate.getTime()) {
+              if (nowMs >= autoClockOutDate.getTime()) {
+                const timeStr = autoClockOutDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                const diffMinutes = Math.round((autoClockOutDate.getTime() - startMs) / 60000);
+                updateDoc(doc(db, 'content_reports', 'data', 'attendance', rec.id), {
+                  clockOutTime: timeStr,
+                  clockOutIso: autoClockOutDate.toISOString(),
+                  workDurationMinutes: diffMinutes > 0 ? diffMinutes : 0,
+                  status: 'completed',
+                  autoClockedOut: true
+                }).catch(err => console.error("Auto clock-out error:", err));
+              }
+            } else {
+              // Late clock-in fallback if clocked in after 6:30 PM (e.g. 7 PM)
+              if (nowMs - startMs > limitMs) {
+                const autoClockOutDate = new Date(startMs + limitMs);
+                const timeStr = autoClockOutDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                updateDoc(doc(db, 'content_reports', 'data', 'attendance', rec.id), {
+                  clockOutTime: timeStr,
+                  clockOutIso: autoClockOutDate.toISOString(),
+                  workDurationMinutes: 480, // 8 hours
+                  status: 'completed',
+                  autoClockedOut: true
+                }).catch(err => console.error("Auto clock-out error:", err));
+              }
+            }
+          } else {
+            if (nowMs - startMs > limitMs) {
+              const autoClockOutDate = new Date(startMs + limitMs);
+              const timeStr = autoClockOutDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+              updateDoc(doc(db, 'content_reports', 'data', 'attendance', rec.id), {
+                clockOutTime: timeStr,
+                clockOutIso: autoClockOutDate.toISOString(),
+                workDurationMinutes: 480, // 8 hours
+                status: 'completed',
+                autoClockedOut: true
+              }).catch(err => console.error("Auto clock-out error:", err));
+            }
           }
         }
       });
@@ -123,6 +203,7 @@ export default function AttendanceManagement({ isGuestMode = false }) {
         const mins = totalMin % 60;
         const durationStr = totalMin > 0 ? `${hrs}h ${mins}m` : (rec.status === 'clocked_in' ? 'Shift Active' : '0m');
         const decimalHrs = parseFloat((totalMin / 60).toFixed(2));
+        const isLate = rec.isLateClockIn || (rec.clockInIso && checkLateClockIn(rec.clockInIso));
 
         return {
           'Employee Name': rec.employeeName || 'Unknown',
@@ -132,7 +213,8 @@ export default function AttendanceManagement({ isGuestMode = false }) {
           'Duration (Minutes)': totalMin,
           'Duration (Hours & Mins)': durationStr,
           'Total Decimal Hours': decimalHrs,
-          'Shift Status': rec.status === 'clocked_in' ? 'Clocked In (Active)' : 'Completed'
+          'Shift Status': rec.status === 'clocked_in' ? 'Clocked In (Active)' : 'Completed',
+          'Late Clock-In': isLate ? 'Yes' : 'No'
         };
       });
 
@@ -197,7 +279,8 @@ export default function AttendanceManagement({ isGuestMode = false }) {
         { wch: 22 }, // Duration (Minutes)
         { wch: 24 }, // Duration (Hours & Mins)
         { wch: 22 }, // Total Decimal Hours
-        { wch: 22 }  // Shift Status
+        { wch: 22 }, // Shift Status
+        { wch: 16 }  // Late Clock-In
       ];
 
       // Append sheet to workbook
@@ -372,7 +455,14 @@ export default function AttendanceManagement({ isGuestMode = false }) {
                       <tr key={rec.id} className="hover:bg-slate-50/50">
                         <td className="p-3 font-semibold text-slate-900">{rec.employeeName}</td>
                         <td className="p-3 font-mono font-semibold text-slate-600">{rec.date}</td>
-                        <td className="p-3 font-mono text-emerald-700 font-semibold">{rec.clockInTime}</td>
+                        <td className="p-3 font-mono text-emerald-700 font-semibold">
+                          <div>{rec.clockInTime}</div>
+                          {(rec.isLateClockIn || (rec.clockInIso && checkLateClockIn(rec.clockInIso))) && (
+                            <span className="inline-flex px-1.5 py-0.5 text-[9px] font-extrabold rounded bg-amber-100 text-amber-800 border border-amber-200 mt-1">
+                              Late Clock-In
+                            </span>
+                          )}
+                        </td>
                         <td className="p-3 font-mono text-rose-700 font-semibold">{rec.clockOutTime || 'Active...'}</td>
                         <td className="p-3 font-bold text-slate-800">{durationStr}</td>
                         <td className="p-3 text-center">

@@ -11,6 +11,54 @@ import {
 } from 'lucide-react';
 import { showToast } from './Toast';
 
+// Helper to check if a clock-in time is after 10:30 AM IST
+const checkLateClockIn = (isoString) => {
+  if (!isoString) return false;
+  try {
+    const date = new Date(isoString);
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    }).formatToParts(date);
+    let hour = 0;
+    let minute = 0;
+    for (const part of parts) {
+      if (part.type === 'hour') hour = parseInt(part.value, 10);
+      if (part.type === 'minute') minute = parseInt(part.value, 10);
+    }
+    return hour > 10 || (hour === 10 && minute > 30);
+  } catch (err) {
+    console.error('Error checking late clock-in:', err);
+    return false;
+  }
+};
+
+// Helper to get 6:30 PM IST Date object for a given date
+const get630PmDate = (isoString) => {
+  try {
+    const date = new Date(isoString);
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date);
+    let year, month, day;
+    for (const p of parts) {
+      if (p.type === 'year') year = p.value;
+      if (p.type === 'month') month = p.value;
+      if (p.type === 'day') day = p.value;
+    }
+    // 13:00 UTC is exactly 18:30 IST (+05:30)
+    return new Date(Date.UTC(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10), 13, 0, 0));
+  } catch (err) {
+    console.error('Error constructing 6:30 PM date:', err);
+    return new Date(new Date(isoString).getTime() + 8 * 60 * 60 * 1000);
+  }
+};
+
 const getPostTypeBadgeStyle = (type) => {
   const t = (type || '').toLowerCase();
   if (t === 'story') return 'bg-purple-50 text-purple-700 border border-purple-200';
@@ -164,17 +212,50 @@ export default function EmployeeDashboard({ employee, onLogout }) {
       if (running && running.clockInIso) {
         const start = new Date(running.clockInIso).getTime();
         const now = new Date().getTime();
-        const limitMs = 8 * 60 * 60 * 1000;
-        if (now - start > limitMs) {
-          const autoClockOutDate = new Date(start + limitMs);
-          const timeStr = autoClockOutDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-          updateDoc(doc(db, 'content_reports', 'data', 'attendance', running.id), {
-            clockOutTime: timeStr,
-            clockOutIso: autoClockOutDate.toISOString(),
-            workDurationMinutes: 480, // 8 hours
-            status: 'completed',
-            autoClockedOut: true
-          }).catch(err => console.error("Auto clock-out error:", err));
+        
+        const isLate = running.isLateClockIn || checkLateClockIn(running.clockInIso);
+        if (isLate) {
+          const autoClockOutDate = get630PmDate(running.clockInIso);
+          if (start < autoClockOutDate.getTime()) {
+            if (now >= autoClockOutDate.getTime()) {
+              const timeStr = autoClockOutDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+              const diffMinutes = Math.round((autoClockOutDate.getTime() - start) / 60000);
+              updateDoc(doc(db, 'content_reports', 'data', 'attendance', running.id), {
+                clockOutTime: timeStr,
+                clockOutIso: autoClockOutDate.toISOString(),
+                workDurationMinutes: diffMinutes > 0 ? diffMinutes : 0,
+                status: 'completed',
+                autoClockedOut: true
+              }).catch(err => console.error("Auto clock-out error:", err));
+            }
+          } else {
+            // Late clock-in fallback if clocked in after 6:30 PM (e.g. 7 PM)
+            const limitMs = 8 * 60 * 60 * 1000;
+            if (now - start > limitMs) {
+              const autoClockOutDate = new Date(start + limitMs);
+              const timeStr = autoClockOutDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+              updateDoc(doc(db, 'content_reports', 'data', 'attendance', running.id), {
+                clockOutTime: timeStr,
+                clockOutIso: autoClockOutDate.toISOString(),
+                workDurationMinutes: 480, // 8 hours
+                status: 'completed',
+                autoClockedOut: true
+              }).catch(err => console.error("Auto clock-out error:", err));
+            }
+          }
+        } else {
+          const limitMs = 8 * 60 * 60 * 1000;
+          if (now - start > limitMs) {
+            const autoClockOutDate = new Date(start + limitMs);
+            const timeStr = autoClockOutDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            updateDoc(doc(db, 'content_reports', 'data', 'attendance', running.id), {
+              clockOutTime: timeStr,
+              clockOutIso: autoClockOutDate.toISOString(),
+              workDurationMinutes: 480, // 8 hours
+              status: 'completed',
+              autoClockedOut: true
+            }).catch(err => console.error("Auto clock-out error:", err));
+          }
         }
       }
 
@@ -272,7 +353,8 @@ export default function EmployeeDashboard({ employee, onLogout }) {
     try {
       const now = new Date();
       const todayStr = now.toLocaleDateString('en-CA');
-      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      const timeStr = now.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      const isLate = checkLateClockIn(now.toISOString());
 
       await addDoc(collection(db, 'content_reports', 'data', 'attendance'), {
         employeeId: employee.id,
@@ -284,7 +366,8 @@ export default function EmployeeDashboard({ employee, onLogout }) {
         clockOutIso: null,
         workDurationMinutes: 0,
         status: 'clocked_in',
-        createdAt: now.toISOString()
+        createdAt: now.toISOString(),
+        isLateClockIn: isLate
       });
     } catch (err) {
       console.error('Clock-in error:', err);
@@ -894,6 +977,11 @@ export default function EmployeeDashboard({ employee, onLogout }) {
                         {formatTimer(elapsedSeconds)}
                       </span>
                       <span className="text-xs text-slate-500 block mt-1">Clocked in at {activeSession.clockInTime}</span>
+                      {(activeSession.isLateClockIn || (activeSession.clockInIso && checkLateClockIn(activeSession.clockInIso))) && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200 mt-2">
+                          Late Clock-In (Auto-Clockout at 06:30 PM)
+                        </span>
+                      )}
                     </div>
                   ) : (
                     <div>
@@ -955,7 +1043,14 @@ export default function EmployeeDashboard({ employee, onLogout }) {
                         attendanceRecords.map((rec) => (
                           <tr key={rec.id} className="hover:bg-slate-50/50">
                             <td className="p-3 font-mono font-semibold text-slate-900">{rec.date}</td>
-                            <td className="p-3 font-mono text-emerald-700 font-semibold">{rec.clockInTime}</td>
+                            <td className="p-3 font-mono text-emerald-700 font-semibold">
+                              <div>{rec.clockInTime}</div>
+                              {(rec.isLateClockIn || (rec.clockInIso && checkLateClockIn(rec.clockInIso))) && (
+                                <span className="inline-flex px-1.5 py-0.5 text-[9px] font-extrabold rounded bg-amber-100 text-amber-800 border border-amber-200 mt-1">
+                                  Late Clock-In
+                                </span>
+                              )}
+                            </td>
                             <td className="p-3 font-mono text-rose-700 font-semibold">{rec.clockOutTime || 'Active...'}</td>
                             <td className="p-3 font-semibold text-slate-800">
                               {rec.workDurationMinutes ? `${Math.floor(rec.workDurationMinutes / 60)}h ${rec.workDurationMinutes % 60}m` : 'In progress'}
